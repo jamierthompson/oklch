@@ -26,34 +26,62 @@ const BLUE: Ramp = {
     { L: 0.45, C: 0.2, H: 262 },
   ],
 };
+const LIGHT = [
+  { token: "surface", ramp: "neutral", step: 0 },
+  {
+    token: "ink",
+    ramp: "neutral",
+    on: "surface",
+    target: CONTRAST_TARGETS.bodyText,
+  },
+  {
+    token: "ink-muted",
+    ramp: "neutral",
+    on: "surface",
+    target: CONTRAST_TARGETS.largeText,
+  },
+  {
+    token: "accent",
+    ramp: "blue",
+    on: "surface",
+    target: CONTRAST_TARGETS.interfaceElement,
+  },
+] as const;
+const DARK = [
+  { token: "surface", ramp: "neutral", step: 6 },
+  {
+    token: "ink",
+    ramp: "neutral",
+    on: "surface",
+    target: CONTRAST_TARGETS.bodyText,
+  },
+  {
+    token: "ink-muted",
+    ramp: "neutral",
+    on: "surface",
+    target: CONTRAST_TARGETS.largeText,
+  },
+  {
+    token: "accent",
+    ramp: "blue",
+    on: "surface",
+    target: CONTRAST_TARGETS.interfaceElement,
+  },
+] as const;
 const SPEC: TokenSetSpec = {
   ramps: [NEUTRAL, BLUE],
   gamut: "srgb",
-  bindings: [
-    { token: "surface", ramp: "neutral", step: 0 },
-    {
-      token: "ink",
-      ramp: "neutral",
-      on: "surface",
-      target: CONTRAST_TARGETS.bodyText,
-    },
-    {
-      token: "ink-muted",
-      ramp: "neutral",
-      on: "surface",
-      target: CONTRAST_TARGETS.largeText,
-    },
-    {
-      token: "accent",
-      ramp: "blue",
-      on: "surface",
-      target: CONTRAST_TARGETS.interfaceElement,
-    },
-  ],
+  light: LIGHT,
+  dark: DARK,
 };
 
 describe("resolveBinding", () => {
-  const context = { ramps: SPEC.ramps, tokens: [], gamut: "srgb" as const };
+  const context = {
+    ramps: SPEC.ramps,
+    tokens: [],
+    scheme: "light" as const,
+    gamut: "srgb" as const,
+  };
 
   it("picks a step by eye and reports the map and the fallback", () => {
     const surface = resolveBinding(
@@ -85,6 +113,7 @@ describe("resolveBinding", () => {
     expect(ink.step).toBeGreaterThan(0);
     expect(ink.receipt).not.toBeNull();
     expect(ink.receipt!.on).toBe("surface");
+    expect(ink.receipt!.scheme).toBe("light");
     expect(ink.receipt!.wcag.passes).toBe(true);
     expect(ink.receipt!.apca.passes).toBe(true);
     expect(ink.receipt!.wcag.standard).toBe(STANDARDS.wcag);
@@ -219,14 +248,24 @@ describe("resolveBinding", () => {
       resolveBinding(
         { token: "x", ramp: "blue", step: 0 },
         // @ts-expect-error the contract under test
-        { ramps: SPEC.ramps, tokens: [] },
+        { ramps: SPEC.ramps, tokens: [], scheme: "light" },
       ),
     ).toThrow(/^resolveBinding: gamut is undefined/);
+  });
+
+  it("throws on a scheme that is not light or dark", () => {
+    expect(() =>
+      resolveBinding(
+        { token: "x", ramp: "blue", step: 0 },
+        // @ts-expect-error the contract under test
+        { ramps: SPEC.ramps, tokens: [], scheme: "dim", gamut: "srgb" },
+      ),
+    ).toThrow(/^resolveBinding: scheme is dim; pass "light" or "dark"/);
   });
 });
 
 describe("buildTokenSet", () => {
-  it("resolves bindings in order and collects one receipt per pairing", () => {
+  it("resolves both schemes in order and pairs every token", () => {
     const set = buildTokenSet(SPEC);
     expect(set.gamut).toBe("srgb");
     expect(set.tokens.map((t) => t.token)).toEqual([
@@ -235,50 +274,97 @@ describe("buildTokenSet", () => {
       "ink-muted",
       "accent",
     ]);
-    expect(set.receipts.map((r) => r.token)).toEqual([
-      "ink",
-      "ink-muted",
-      "accent",
+    for (const pair of set.tokens) {
+      expect(pair.light.token).toBe(pair.token);
+      expect(pair.dark.token).toBe(pair.token);
+    }
+    const surface = set.tokens[0]!;
+    expect(surface.light.color.L).toBeGreaterThan(surface.dark.color.L);
+  });
+
+  it("collects one receipt per pairing per scheme, light first", () => {
+    const set = buildTokenSet(SPEC);
+    expect(set.receipts.map((r) => `${r.scheme}:${r.token}`)).toEqual([
+      "light:ink",
+      "light:ink-muted",
+      "light:accent",
+      "dark:ink",
+      "dark:ink-muted",
+      "dark:accent",
     ]);
     for (const r of set.receipts) {
       expect(r.on).toBe("surface");
       expect(r.wcag.passes && r.apca.passes).toBe(true);
     }
+    expect(set.receipts[0]!.apca.polarity).toBe("dark-on-light");
+    expect(set.receipts[3]!.apca.polarity).toBe("light-on-dark");
   });
 
-  it("is nothing more than resolveBinding in order", () => {
+  it("is nothing more than resolveBinding in order, per scheme", () => {
     const set = buildTokenSet(SPEC);
-    const tokens: ReturnType<typeof resolveBinding>[] = [];
-    for (const b of SPEC.bindings) {
-      tokens.push(
-        resolveBinding(b, { ramps: SPEC.ramps, tokens, gamut: SPEC.gamut }),
-      );
+    for (const scheme of ["light", "dark"] as const) {
+      const tokens: ReturnType<typeof resolveBinding>[] = [];
+      for (const b of SPEC[scheme]) {
+        tokens.push(
+          resolveBinding(b, {
+            ramps: SPEC.ramps,
+            tokens,
+            scheme,
+            gamut: SPEC.gamut,
+          }),
+        );
+      }
+      expect(set.tokens.map((t) => t[scheme])).toEqual(tokens);
     }
-    expect(set.tokens).toEqual(tokens);
   });
 
-  it("a looser target solves to an earlier step", () => {
+  it("solves each scheme on its own surface: dark ink lands on a light step", () => {
     const set = buildTokenSet(SPEC);
     const ink = set.tokens.find((t) => t.token === "ink")!;
-    const muted = set.tokens.find((t) => t.token === "ink-muted")!;
-    expect(muted.step).toBeLessThan(ink.step);
+    expect(ink.light.step).toBeGreaterThan(3);
+    expect(ink.dark.step).toBeLessThan(3);
+  });
+
+  it("refuses a token bound in only one scheme, by name", () => {
+    expect(() => buildTokenSet({ ...SPEC, dark: DARK.slice(0, 3) })).toThrow(
+      /^buildTokenSet: every token needs both schemes to ship as light-dark\(\): "accent" has no dark binding/,
+    );
+    expect(() =>
+      buildTokenSet({
+        ...SPEC,
+        dark: [...DARK, { token: "extra", ramp: "blue", step: 0 }],
+      }),
+    ).toThrow(/"extra" has no light binding/);
   });
 
   it("builds for P3 and measures on the sRGB fallback", () => {
     const set = buildTokenSet({
       ...SPEC,
       gamut: "p3",
-      ramps: [NEUTRAL, { name: "blue", steps: [{ L: 0.5, C: 0.27, H: 262 }] }],
+      ramps: [
+        NEUTRAL,
+        {
+          name: "blue",
+          steps: [
+            { L: 0.5, C: 0.27, H: 262 },
+            { L: 0.75, C: 0.15, H: 262 },
+          ],
+        },
+      ],
     });
     const accent = set.tokens.find((t) => t.token === "accent")!;
-    expect(inGamut(accent.color, "p3")).toBe(true);
-    expect(accent.fallback.moved).toBe(true);
-    expect(accent.receipt!.measured.token).toEqual(accent.fallback.color);
+    expect(accent.light.step).toBe(0);
+    expect(accent.dark.step).toBe(1);
+    expect(inGamut(accent.light.color, "p3")).toBe(true);
+    expect(accent.light.fallback.moved).toBe(true);
+    expect(accent.light.receipt!.measured.token).toEqual(
+      accent.light.fallback.color,
+    );
   });
 
-  it("throws on an empty binding list", () => {
-    expect(() => buildTokenSet({ ...SPEC, bindings: [] })).toThrow(
-      /^buildTokenSet: there are no bindings/,
+  it("throws on an empty scheme", () => {
+    expect(() => buildTokenSet({ ...SPEC, dark: [] })).toThrow(
+      /^buildTokenSet: the dark scheme has no bindings; light and dark are one set/,
     );
   });
 
@@ -290,8 +376,8 @@ describe("buildTokenSet", () => {
   });
 
   it("propagates a binding's refusal", () => {
-    expect(() =>
-      buildTokenSet({ ...SPEC, bindings: [SPEC.bindings[1]!] }),
-    ).toThrow(/sits on "surface", which is not bound yet/);
+    expect(() => buildTokenSet({ ...SPEC, light: [LIGHT[1]] })).toThrow(
+      /sits on "surface", which is not bound yet/,
+    );
   });
 });

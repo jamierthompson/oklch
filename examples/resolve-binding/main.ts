@@ -4,7 +4,7 @@ import {
   resolveBinding,
 } from "@jamiethompson/oklch";
 
-import { readSpec, specText, tokenRow } from "../shared/spec.ts";
+import { readSpec, resolvedRow, specText } from "../shared/spec.ts";
 import {
   field,
   form,
@@ -36,14 +36,16 @@ const step = field(f, "step", {
   placeholder: "blank = solve",
 });
 const on = field(f, "on", { value: "surface", spellcheck: "false" });
+const scheme = select(f, "scheme", ["light", "dark"]);
 const target = select(f, "target", ["", ...Object.keys(CONTRAST_TARGETS)]);
 target.value = "bodyText";
 const gamut = gamutField(f);
 
 live(f, out(main), () => {
   const g = gamut() as never;
-  const { ramps, bindings } = readSpec(spec.value);
-  const set = buildTokenSet({ ramps, bindings, gamut: g });
+  const { ramps, light, dark } = readSpec(spec.value);
+  const set = buildTokenSet({ ramps, light, dark, gamut: g });
+  const which = scheme.value as "light" | "dark";
   const binding = {
     token: token.value,
     ramp: ramp.value,
@@ -58,11 +60,12 @@ live(f, out(main), () => {
   };
   const resolved = resolveBinding(binding, {
     ramps,
-    tokens: set.tokens,
+    tokens: set.tokens.map((p) => p[which]),
+    scheme: which,
     gamut: g,
   });
   return (
-    `<div class="wrap"><table><tr><th>token</th><th></th><th>from</th><th>moved</th><th>receipt</th></tr>${tokenRow(resolved, set)}</table></div>` +
+    `<div class="wrap"><table><tr><th>token</th><th colspan="2">${which}</th></tr>${resolvedRow(resolved, set, which)}</table></div>` +
     json(resolved)
   );
 });

@@ -47,8 +47,11 @@ export const STANDARDS = {
 } as const;
 
 /** A usage guarantee for one pairing: this token on that surface was verified, and by which standard. */
+export type Scheme = "light" | "dark";
+
 export interface Receipt {
   readonly token: string;
+  readonly scheme: Scheme;
   readonly on: string;
   readonly target: ContrastTarget;
   readonly wcag: MeterReading & { readonly standard: typeof STANDARDS.wcag };
@@ -79,6 +82,8 @@ export interface ResolvedToken {
 
 export interface BindingContext {
   readonly ramps: readonly Ramp[];
+  /** The scheme being bound; it travels on the receipt. */
+  readonly scheme: Scheme;
   /** Tokens already resolved, in order; `on` may name any of them. */
   readonly tokens: readonly ResolvedToken[];
   readonly gamut: Gamut;
@@ -98,12 +103,18 @@ function assertIdent(fn: string, what: string, name: string): string {
 }
 
 function receiptFrom(
-  binding: { token: string; on: string; target: ContrastTarget },
+  binding: {
+    token: string;
+    scheme: Scheme;
+    on: string;
+    target: ContrastTarget;
+  },
   check: ContrastCheck,
   measured: Receipt["measured"],
 ): Receipt {
   return {
     token: binding.token,
+    scheme: binding.scheme,
     on: binding.on,
     target: binding.target,
     wcag: { ...check.wcag, standard: STANDARDS.wcag },
@@ -129,6 +140,11 @@ export function resolveBinding(
   if (!GAMUTS.includes(context.gamut)) {
     throw new TypeError(
       `${fn}: gamut is ${String(context.gamut)}; pass "srgb" or "p3". There is no default.`,
+    );
+  }
+  if (context.scheme !== "light" && context.scheme !== "dark") {
+    throw new TypeError(
+      `${fn}: scheme is ${String(context.scheme)}; pass "light" or "dark"`,
     );
   }
   if (context.tokens.some((t) => t.token === token)) {
@@ -184,7 +200,12 @@ export function resolveBinding(
         );
       }
       receipt = receiptFrom(
-        { token, on: surface.token, target: binding.target },
+        {
+          token,
+          scheme: context.scheme,
+          on: surface.token,
+          target: binding.target,
+        },
         check,
         {
           token: fallback.color,
@@ -241,45 +262,95 @@ export function resolveBinding(
 
 export interface TokenSetSpec {
   readonly ramps: readonly Ramp[];
-  /** Resolved in order; a surface must come before the inks that sit on it. */
-  readonly bindings: readonly Binding[];
+  /** Each scheme's bindings, resolved in order; a surface must come before the inks that sit on it. */
+  readonly light: readonly Binding[];
+  readonly dark: readonly Binding[];
   readonly gamut: Gamut;
+}
+
+/** One token in both schemes: what `light-dark()` ships. */
+export interface TokenPair {
+  readonly token: string;
+  readonly light: ResolvedToken;
+  readonly dark: ResolvedToken;
 }
 
 export interface TokenSet {
   readonly gamut: Gamut;
-  readonly tokens: readonly ResolvedToken[];
-  /** One per pairing, in binding order. */
+  /** In the light scheme's binding order. */
+  readonly tokens: readonly TokenPair[];
+  /** One per pairing per scheme, light first, in binding order. */
   readonly receipts: readonly Receipt[];
 }
 
 /**
- * Bind these ramps to these semantic roles, with a receipt per pairing.
+ * Bind these ramps to these semantic roles, in both schemes, with a receipt
+ * per pairing.
  *
- * Nothing more than `resolveBinding` in order, so anything this builds can
- * be rebuilt one binding at a time. Throws on an empty binding list and on
- * whatever any binding refuses.
+ * Nothing more than `resolveBinding` in order, once per scheme, so anything
+ * this builds can be rebuilt one binding at a time. Light and dark are one
+ * set because they ship as one `light-dark()` value per token, so every
+ * token must be bound in both; one bound in only one scheme is refused by
+ * name. Throws on an empty scheme and on whatever any binding refuses.
  */
 export function buildTokenSet(spec: TokenSetSpec): TokenSet {
+  const fn = "buildTokenSet";
   if (!GAMUTS.includes(spec.gamut)) {
     throw new TypeError(
-      `buildTokenSet: gamut is ${String(spec.gamut)}; pass "srgb" or "p3". There is no default.`,
+      `${fn}: gamut is ${String(spec.gamut)}; pass "srgb" or "p3". There is no default.`,
     );
   }
-  if (spec.bindings.length === 0) {
+  for (const scheme of ["light", "dark"] as const) {
+    if (spec[scheme].length === 0) {
+      throw new RangeError(
+        `${fn}: the ${scheme} scheme has no bindings; light and dark are one set, and a set with no tokens is not one`,
+      );
+    }
+  }
+
+  const resolve = (scheme: Scheme): ResolvedToken[] => {
+    const tokens: ResolvedToken[] = [];
+    for (const binding of spec[scheme]) {
+      tokens.push(
+        resolveBinding(binding, {
+          ramps: spec.ramps,
+          tokens,
+          scheme,
+          gamut: spec.gamut,
+        }),
+      );
+    }
+    return tokens;
+  };
+  const light = resolve("light");
+  const dark = resolve("dark");
+
+  const names = (tokens: ResolvedToken[]): Set<string> =>
+    new Set(tokens.map((t) => t.token));
+  const lightNames = names(light);
+  const darkNames = names(dark);
+  const onlyLight = [...lightNames].filter((n) => !darkNames.has(n));
+  const onlyDark = [...darkNames].filter((n) => !lightNames.has(n));
+  if (onlyLight.length > 0 || onlyDark.length > 0) {
+    const missing = [
+      ...onlyLight.map((n) => `"${n}" has no dark binding`),
+      ...onlyDark.map((n) => `"${n}" has no light binding`),
+    ];
     throw new RangeError(
-      "buildTokenSet: there are no bindings; a token set with no tokens is not one",
+      `${fn}: every token needs both schemes to ship as light-dark(): ${missing.join("; ")}`,
     );
   }
-  const tokens: ResolvedToken[] = [];
-  for (const binding of spec.bindings) {
-    tokens.push(
-      resolveBinding(binding, { ramps: spec.ramps, tokens, gamut: spec.gamut }),
-    );
-  }
+
+  const tokens: TokenPair[] = light.map((l) => ({
+    token: l.token,
+    light: l,
+    dark: dark.find((d) => d.token === l.token)!,
+  }));
   return {
     gamut: spec.gamut,
     tokens,
-    receipts: tokens.flatMap((t) => (t.receipt === null ? [] : [t.receipt])),
+    receipts: [...light, ...dark].flatMap((t) =>
+      t.receipt === null ? [] : [t.receipt],
+    ),
   };
 }

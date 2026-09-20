@@ -6,11 +6,11 @@ import { form, gamutField, live, out, page, steps } from "../shared/ui.ts";
 const main = page(
   "tokenSetToDesignTokens",
   "What does this ship as, for a token pipeline?",
-  "DTCG 2025.10: one <code>color</code> token per binding, <code>$value</code> in OkLCH at full precision holding what ships in the set's gamut, the format's own <code>hex</code> slot carrying the sRGB fallback. The fallback's exact components, the ramp step, and the receipt travel in <code>$extensions</code>.",
+  "DTCG 2025.10, with a <code>light</code> and a <code>dark</code> group because the format has no mode of its own: in each, one <code>color</code> token per binding, <code>$value</code> in OkLCH at full precision holding what ships in the set's gamut, the format's own <code>hex</code> slot carrying the sRGB fallback. The fallback's exact components, the ramp step, and the receipt travel in <code>$extensions</code>.",
 );
 const f = form(main);
 const spec = steps(f, "spec", specText());
-spec.rows = 14;
+spec.rows = 20;
 const gamut = gamutField(f);
 
 const escape = (s: string): string =>

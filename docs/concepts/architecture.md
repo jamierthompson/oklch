@@ -23,7 +23,8 @@ from Tier 1's public surface only; `tests/architecture.test.ts` reads the Tier 2
 sources and fails if they import anything else.
 
 **Tier 3 — a whole system.** `resolveBinding` and `buildTokenSet` bind the
-steps an eye placed to semantic roles, with a receipt per pairing; the three
+steps an eye placed to semantic roles, in a light and a dark scheme that ship as
+one `light-dark()` value per token, with a receipt per pairing per scheme; the three
 exporters ship the set as CSS, DTCG design tokens, or a Tailwind theme. The
 opinion layer, every part rebuildable from Tiers 1–2. A pairing that does not
 clear is refused, not filled in — there is no fallback color anywhere.

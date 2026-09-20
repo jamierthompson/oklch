@@ -5,7 +5,13 @@
  */
 
 import { formatHex, formatOklch, type OkLCH } from "./tier1.js";
-import type { Receipt, ResolvedToken, TokenSet } from "./binding.js";
+import type {
+  Receipt,
+  ResolvedToken,
+  Scheme,
+  TokenPair,
+  TokenSet,
+} from "./binding.js";
 
 export interface DeclarationsOptions {
   /** The rule the variables are declared on. Default `:root`. */
@@ -14,50 +20,65 @@ export interface DeclarationsOptions {
   readonly prefix?: string;
 }
 
-/** Tokens whose P3 color differs from what sRGB screens get. */
-function p3Overrides(set: TokenSet): ResolvedToken[] {
-  return set.gamut === "p3" ? set.tokens.filter((t) => t.fallback.moved) : [];
+type Pick = (t: ResolvedToken) => OkLCH;
+
+/** A token's `light-dark()` value, from whichever color of each scheme `pick` chooses. */
+function lightDark(pair: TokenPair, pick: Pick): string {
+  return `light-dark(${formatOklch(pick(pair.light))}, ${formatOklch(pick(pair.dark))})`;
+}
+
+/** Tokens whose P3 color differs from what sRGB screens get, in either scheme. */
+function p3Overrides(set: TokenSet): TokenPair[] {
+  return set.gamut === "p3"
+    ? set.tokens.filter((t) => t.light.fallback.moved || t.dark.fallback.moved)
+    : [];
 }
 
 function block(selector: string, lines: string[], indent = ""): string {
   return `${indent}${selector} {\n${lines.map((l) => `${indent}  ${l}`).join("\n")}\n${indent}}`;
 }
 
-function variables(
-  set: TokenSet,
-  name: (t: ResolvedToken) => string,
-): string[] {
-  return set.tokens.map((t) => `${name(t)}: ${formatOklch(t.fallback.color)};`);
+const fallback: Pick = (t) => t.fallback.color;
+const shipped: Pick = (t) => t.color;
+
+function variables(set: TokenSet, name: (t: TokenPair) => string): string[] {
+  return set.tokens.map((t) => `${name(t)}: ${lightDark(t, fallback)};`);
 }
 
 function p3Block(
   set: TokenSet,
   selector: string,
-  name: (t: ResolvedToken) => string,
+  name: (t: TokenPair) => string,
 ): string {
   const overrides = p3Overrides(set);
   if (overrides.length === 0) return "";
-  const lines = overrides.map((t) => `${name(t)}: ${formatOklch(t.color)};`);
+  const lines = overrides.map((t) => `${name(t)}: ${lightDark(t, shipped)};`);
   return `\n\n@media (color-gamut: p3) {\n${block(selector, lines, "  ")}\n}`;
 }
+
+/** `light-dark()` resolves against `color-scheme`; without this line it is inert. */
+const COLOR_SCHEME = "color-scheme: light dark;";
 
 /**
  * What does this ship as, in plain CSS?
  *
- * One custom property per token on `selector`, holding the sRGB fallback at
+ * `color-scheme: light dark` and one custom property per token on
+ * `selector`, each a `light-dark()` of the two schemes' sRGB fallbacks at
  * full precision. When the set was built for P3, every token whose P3 color
- * differs from its fallback is redeclared under `@media (color-gamut: p3)`.
- * A set built for sRGB emits no media block: there is nothing to override.
+ * differs from its fallback in either scheme is redeclared under
+ * `@media (color-gamut: p3)`. A set built for sRGB emits no media block:
+ * there is nothing to override.
  */
 export function tokenSetToDeclarations(
   set: TokenSet,
   options: DeclarationsOptions = {},
 ): string {
   const selector = options.selector ?? ":root";
-  const name = (t: ResolvedToken): string =>
-    `--${options.prefix ?? ""}${t.token}`;
+  const name = (t: TokenPair): string => `--${options.prefix ?? ""}${t.token}`;
   return (
-    block(selector, variables(set, name)) + p3Block(set, selector, name) + "\n"
+    block(selector, [COLOR_SCHEME, ...variables(set, name)]) +
+    p3Block(set, selector, name) +
+    "\n"
   );
 }
 
@@ -65,14 +86,19 @@ export function tokenSetToDeclarations(
  * What does this ship as, for Tailwind v4?
  *
  * `--color-<token>` variables in `@theme`, so `bg-<token>` and `text-<token>`
- * utilities exist. Tailwind emits theme variables on `:root`, so the P3
- * override redeclares them there under the media query, where the
- * utilities' `var()` references pick them up.
+ * utilities exist, each a `light-dark()` value. `color-scheme` cannot live
+ * in `@theme`, so it is declared on `:root` alongside, which is also where
+ * Tailwind emits theme variables and where the P3 override redeclares them
+ * under the media query.
  */
 export function tokenSetToTailwindTheme(set: TokenSet): string {
-  const name = (t: ResolvedToken): string => `--color-${t.token}`;
+  const name = (t: TokenPair): string => `--color-${t.token}`;
   return (
-    block("@theme", variables(set, name)) + p3Block(set, ":root", name) + "\n"
+    block("@theme", variables(set, name)) +
+    "\n\n" +
+    block(":root", [COLOR_SCHEME]) +
+    p3Block(set, ":root", name) +
+    "\n"
   );
 }
 
@@ -91,6 +117,7 @@ export interface DesignToken {
   readonly $extensions: {
     readonly "com.jamiethompson.oklch": {
       readonly gamut: TokenSet["gamut"];
+      readonly scheme: Scheme;
       readonly ramp: string;
       readonly step: number;
       readonly how: ResolvedToken["how"];
@@ -101,8 +128,10 @@ export interface DesignToken {
   };
 }
 
+/** One group per scheme, because the format has no notion of a mode. */
 export interface DesignTokens {
-  readonly [token: string]: DesignToken;
+  readonly light: { readonly [token: string]: DesignToken };
+  readonly dark: { readonly [token: string]: DesignToken };
 }
 
 const components = (c: OkLCH): readonly [number, number, number] => [
@@ -111,43 +140,53 @@ const components = (c: OkLCH): readonly [number, number, number] => [
   c.H,
 ];
 
+function designToken(
+  set: TokenSet,
+  scheme: Scheme,
+  t: ResolvedToken,
+): DesignToken {
+  return {
+    $type: "color",
+    $value: {
+      colorSpace: "oklch",
+      components: components(t.color),
+      alpha: 1,
+      hex: formatHex(t.fallback.color).hex,
+    },
+    ...(t.receipt === null
+      ? {}
+      : {
+          $description: `On ${t.receipt.on}: ${t.receipt.wcag.standard} ${t.receipt.wcag.value.toFixed(2)} (≥ ${t.receipt.target.wcag}); ${t.receipt.apca.standard} ${t.receipt.apca.value.toFixed(1)} (≥ ${t.receipt.target.apca}).`,
+        }),
+    $extensions: {
+      "com.jamiethompson.oklch": {
+        gamut: set.gamut,
+        scheme,
+        ramp: t.ramp,
+        step: t.step,
+        how: t.how,
+        fallback: components(t.fallback.color),
+        receipt: t.receipt,
+      },
+    },
+  };
+}
+
 /**
  * What does this ship as, for a token pipeline?
  *
- * DTCG 2025.10: one `color` token per binding, `$value` in OkLCH at full
- * precision holding the color that ships in the set's gamut, with the
- * format's `hex` slot carrying the sRGB fallback as the specification
- * intends. The fallback's exact components, the ramp step, and the receipt
- * travel in `$extensions` under this package's reverse-domain key.
+ * DTCG 2025.10, with a `light` and a `dark` group because the format has no
+ * mode of its own: in each, one `color` token per binding, `$value` in
+ * OkLCH at full precision holding the color that ships in the set's gamut,
+ * with the format's `hex` slot carrying the sRGB fallback as the
+ * specification intends. The fallback's exact components, the ramp step,
+ * and the receipt travel in `$extensions` under this package's
+ * reverse-domain key.
  */
 export function tokenSetToDesignTokens(set: TokenSet): DesignTokens {
-  return Object.fromEntries(
-    set.tokens.map((t) => [
-      t.token,
-      {
-        $type: "color",
-        $value: {
-          colorSpace: "oklch",
-          components: components(t.color),
-          alpha: 1,
-          hex: formatHex(t.fallback.color).hex,
-        },
-        ...(t.receipt === null
-          ? {}
-          : {
-              $description: `On ${t.receipt.on}: ${t.receipt.wcag.standard} ${t.receipt.wcag.value.toFixed(2)} (≥ ${t.receipt.target.wcag}); ${t.receipt.apca.standard} ${t.receipt.apca.value.toFixed(1)} (≥ ${t.receipt.target.apca}).`,
-            }),
-        $extensions: {
-          "com.jamiethompson.oklch": {
-            gamut: set.gamut,
-            ramp: t.ramp,
-            step: t.step,
-            how: t.how,
-            fallback: components(t.fallback.color),
-            receipt: t.receipt,
-          },
-        },
-      } satisfies DesignToken,
-    ]),
-  );
+  const group = (scheme: Scheme): DesignTokens[Scheme] =>
+    Object.fromEntries(
+      set.tokens.map((t) => [t.token, designToken(set, scheme, t[scheme])]),
+    );
+  return { light: group("light"), dark: group("dark") };
 }

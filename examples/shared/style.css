@@ -161,3 +161,39 @@ ul.index {
 ul.index li {
   margin: 6px 0;
 }
+textarea {
+  font: 14px/1.5 var(--mono);
+  padding: 6px 8px;
+  border: 1px solid var(--hair);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink);
+  width: 100%;
+  resize: vertical;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font: 13px/1.4 var(--mono);
+  margin: 0 0 12px;
+}
+th,
+td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--hair);
+  white-space: nowrap;
+}
+th {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+td.chip div {
+  width: 28px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid var(--hair);
+}
+.wrap {
+  overflow-x: auto;
+}

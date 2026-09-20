@@ -16,9 +16,11 @@ answers it with a report.
 **Tier 1 — one color or one pair.** Parse, gamut, distance, contrast, the two
 solvers, hue, format. This is the whole package today.
 
-**Tier 2 — a list of steps.** Inspecting a ramp the eye placed: what each step
-measures, and how the neighbours relate. Built from Tier 1 only; an architectural
-test will enforce it.
+**Tier 2 — a list of steps.** `inspectRamp` measures a ramp the eye placed —
+nothing is generated. `minPass` finds the first step that clears a surface.
+`createScale` is the one continuous thing, for data rather than palettes. Built
+from Tier 1's public surface only; `tests/architecture.test.ts` reads the Tier 2
+sources and fails if they import anything else.
 
 **Tier 3 — a whole system.** Binding ramps to semantic roles with a receipt per
 pairing, and exporting. The opinion layer, every part rebuildable from Tiers 1–2.

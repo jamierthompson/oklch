@@ -33,6 +33,15 @@ gamut-aware function takes the gamut, and a missing one throws.
 | `formatOklch(color)`                  | What does the stylesheet get?                                      |
 | `formatHex(color)`                    | What does a hex-only consumer get?                                 |
 
+Tier 2: a list of steps. Built from Tier 1's public surface alone, and an
+architectural test in `tests/` fails if it imports anything else.
+
+| Function                    | The question it answers                                                 |
+| --------------------------- | ----------------------------------------------------------------------- |
+| `inspectRamp(steps, gamut)` | What does each step I placed measure, and how do the neighbours relate? |
+| `minPass(ramp, bg, target)` | Which is the first step that clears on this surface?                    |
+| `createScale(options)`      | Equal steps in data → equal perceived steps? (for data, not palettes)   |
+
 ```ts
 import {
   CONTRAST_TARGETS,
@@ -83,6 +92,7 @@ pnpm gate    # format, lint, typecheck, test, build — what CI runs
 
 - `packages/oklch` — the library. Its only dependency is colorjs.io.
 - `examples` — one Vite page per function, each showing when you'd reach for it.
+- `tests` — the architectural test that keeps Tier 2 on Tier 1's public surface.
 - `docs/concepts` — the architecture and the contract.
 
 ## License

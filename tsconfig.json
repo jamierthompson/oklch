@@ -2,7 +2,8 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "lib": ["esnext"]
+    "lib": ["esnext"],
+    "types": ["node"]
   },
-  "include": ["vitest.config.ts", "eslint.config.mjs"]
+  "include": ["vitest.config.ts", "eslint.config.mjs", "tests"]
 }

@@ -126,3 +126,34 @@ export function json(value: unknown): string {
 export function fixed(n: number, digits = 4): string {
   return n.toFixed(digits);
 }
+
+/** A multi-line steps field: one CSS color per line. */
+export function steps(
+  form: HTMLFormElement,
+  label: string,
+  value: string,
+): HTMLTextAreaElement {
+  const el = document.createElement("label");
+  el.innerHTML = `<span>${label}</span>`;
+  const area = document.createElement("textarea");
+  area.rows = 7;
+  area.spellcheck = false;
+  area.value = value;
+  el.append(area);
+  form.append(el);
+  return area;
+}
+
+/** Parse every non-empty line as a color, naming the line that is not one. */
+export function colors(area: HTMLTextAreaElement): OkLCH[] {
+  return area.value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+    .map((line, i) => {
+      const parsed = parseColor(line);
+      if (parsed === null)
+        throw new Error(`line ${i + 1}: parseColor("${line}") is null`);
+      return parsed;
+    });
+}

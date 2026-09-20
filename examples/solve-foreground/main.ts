@@ -24,7 +24,7 @@ const main = page(
 );
 const f = form(main);
 const bg = field(f, "background", {
-  value: "oklch(0.7 0.1 150)",
+  value: "oklch(0.9 0.08 150)",
   spellcheck: "false",
 });
 const C = field(f, "ink C", {
@@ -50,7 +50,7 @@ live(f, out(main), () => {
   const pane = (name: "light" | "dark") => {
     const s = solved.toward[name];
     if (s === null)
-      return `<div class="pair" style="background:${formatOklch(b)}">toward ${name}: nothing clears</div>`;
+      return `<pre>toward ${name}: nothing clears, not even the pole</pre>`;
     return `<div class="pair" style="color:${formatOklch(s.color)};background:${formatOklch(b)}">toward ${name}: L ${s.lightness.toFixed(5)}${solved.nearest === name ? " (nearest)" : ""}</div>`;
   };
   return pane("light") + pane("dark") + json(solved);

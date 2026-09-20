@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
  * guarantee is a test, not a diagram.
  */
 const TIER_2 = ["ramp.ts", "scale.ts"];
+const TIER_3 = ["binding.ts", "export.ts"];
 const IMPORT = /^\s*(?:import|export)[\s\S]*?from\s+["']([^"']+)["']/gm;
 
 const src = join(import.meta.dirname, "..", "packages", "oklch", "src");
@@ -20,7 +21,13 @@ describe("tiers", () => {
     );
     const tier1 = readFileSync(join(src, "tier1.ts"), "utf8");
     for (const file of modules) {
-      if (file === "index.ts" || file === "tier1.ts" || TIER_2.includes(file))
+      if (
+        file === "index.ts" ||
+        file === "tier1.ts" ||
+        file === "tier2.ts" ||
+        TIER_2.includes(file) ||
+        TIER_3.includes(file)
+      )
         continue;
       expect(tier1, `${file} is exported from tier1.ts`).toContain(
         `./${file.replace(/\.ts$/, ".js")}`,
@@ -37,4 +44,28 @@ describe("tiers", () => {
     }
     expect(source).not.toContain("colorjs.io");
   });
+
+  it("tier2.ts re-exports exactly the Tier 2 modules", () => {
+    const tier2 = readFileSync(join(src, "tier2.ts"), "utf8");
+    for (const file of TIER_2)
+      expect(tier2).toContain(`./${file.replace(/\.ts$/, ".js")}`);
+  });
+
+  it.each(TIER_3)(
+    "%s imports from Tiers 1 and 2, and its own tier, only",
+    (file) => {
+      const source = readFileSync(join(src, file), "utf8");
+      const specifiers = [...source.matchAll(IMPORT)].map((m) => m[1]);
+      expect(specifiers.length).toBeGreaterThan(0);
+      const legal = [
+        "./tier1.js",
+        "./tier2.js",
+        ...TIER_3.map((f) => `./${f.replace(/\.ts$/, ".js")}`),
+      ];
+      for (const specifier of specifiers) {
+        expect(legal, `${file} imports ${specifier}`).toContain(specifier);
+      }
+      expect(source).not.toContain("colorjs.io");
+    },
+  );
 });

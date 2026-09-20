@@ -12,25 +12,21 @@ import {
 /**
  * What does the stylesheet get?
  *
- * A CSS `oklch()` string whose numerals are the channel values at full
- * precision — the emitted string is the computed color. colorjs.io's
- * serializer gamut-maps by default and rounds to five significant digits;
- * both are switched off here, explicitly, at the call site. Out-of-gamut
- * colors serialize unchanged: what a P3 screen gets is decided by the
- * stylesheet, not by the formatter.
+ * A CSS `oklch()` string whose numerals are the channel values exactly: the
+ * emitted string is the computed color, and parsing it back returns the
+ * same doubles. colorjs.io's serializer cannot promise that — it gamut-maps
+ * by default, rounds to five significant digits by default, and even at 17
+ * digits its rounding step (`floor(n × 10^17 + 0.5) / 10^17`) loses the
+ * last bit of a double — so this function does not use it. JavaScript's own
+ * shortest round-trip form is exact by definition, and CSS accepts its
+ * exponent notation for tiny magnitudes.
  *
  * Throws on a non-finite channel: there is no valid CSS to make from one,
  * and a browser drops an invalid declaration without a word.
  */
 export function formatOklch(color: OkLCH): string {
   const c = assertColor("formatOklch", "color", color);
-  return serialize(toColorjs(c), {
-    inGamut: false,
-    // 17 significant digits round-trips every double exactly.
-    precision: 17,
-    coords: ["<number>", "<number>", "<number>"],
-    alpha: { include: false },
-  });
+  return `oklch(${String(c.L)} ${String(c.C)} ${String(c.H)})`;
 }
 
 /** What a hex-only consumer gets, and what it cost. */

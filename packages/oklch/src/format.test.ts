@@ -17,6 +17,20 @@ describe("formatOklch", () => {
     );
   });
 
+  it("round-trips doubles that colorjs.io's 17-digit serializer does not", () => {
+    // colorjs.io rounds with floor(n * 1e17 + 0.5) / 1e17, which is lossy in
+    // the last bit; this value came back one ulp off through it.
+    const L = 0.9798781762489561;
+    expect(formatOklch({ L, C: 0.004, H: 260 })).toBe(
+      "oklch(0.9798781762489561 0.004 260)",
+    );
+    expect(parseColor(formatOklch({ L, C: 0.004, H: 260 }))).toEqual({
+      L,
+      C: 0.004,
+      H: 260,
+    });
+  });
+
   it("does not gamut-map: colorjs.io's default is off", () => {
     expect(formatOklch({ L: 0.6, C: 0.35, H: 30 })).toBe("oklch(0.6 0.35 30)");
   });

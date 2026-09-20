@@ -22,8 +22,11 @@ nothing is generated. `minPass` finds the first step that clears a surface.
 from Tier 1's public surface only; `tests/architecture.test.ts` reads the Tier 2
 sources and fails if they import anything else.
 
-**Tier 3 — a whole system.** Binding ramps to semantic roles with a receipt per
-pairing, and exporting. The opinion layer, every part rebuildable from Tiers 1–2.
+**Tier 3 — a whole system.** `resolveBinding` and `buildTokenSet` bind the
+steps an eye placed to semantic roles, with a receipt per pairing; the three
+exporters ship the set as CSS, DTCG design tokens, or a Tailwind theme. The
+opinion layer, every part rebuildable from Tiers 1–2. A pairing that does not
+clear is refused, not filled in — there is no fallback color anywhere.
 
 The tiers are a guarantee, not a diagram: a higher tier has no privileged access
 to anything below it. If it needed some, the public API would be incomplete, and
@@ -58,6 +61,16 @@ rather than map, so a P3 literal shipped alone is a clip on every sRGB screen;
 `gamutMap(color, "srgb")` is the tool for seeing what those screens should have
 been handed instead. The solvers go further: a candidate is mapped into the
 gamut that ships and measured on its sRGB fallback, and both are in the report.
+
+## Receipts
+
+A receipt is a usage guarantee, not a log of arithmetic. It attaches to a
+pairing — this token on that surface — and states that the pairing was verified,
+what each meter read, and **which standard that reading answers to**. A WCAG 2.2
+ratio is a conformance claim with legal weight in most regions; an APCA Lc is a
+design signal and legal cover for nothing. A number without its standard invites
+exactly the misplaced confidence this package exists to prevent, so a receipt
+always carries both, by name.
 
 ## Where invariants live
 

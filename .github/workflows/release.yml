@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Trusted publishing: npm authenticates this workflow via OIDC.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm gate
+      - name: Verify the tag matches the package version
+        run: test "v$(node -p "require('./packages/oklch/package.json').version")" = "$GITHUB_REF_NAME"
+      - run: npm install -g npm@latest
+      - run: npm publish
+        working-directory: packages/oklch

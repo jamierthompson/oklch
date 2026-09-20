@@ -1,0 +1,40 @@
+{
+  "name": "@jamiethompson/oklch",
+  "version": "0.0.0",
+  "description": "A thin contract over colorjs.io for OKLCH design work: refuses by name, reports what moved, never clamps, rounds, or falls back.",
+  "license": "MIT",
+  "author": "Jamie Thompson",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "keywords": [
+    "oklch",
+    "color",
+    "p3",
+    "gamut",
+    "contrast",
+    "apca",
+    "wcag",
+    "colorjs.io"
+  ],
+  "dependencies": {
+    "colorjs.io": "^0.7.1"
+  }
+}

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>oklch · examples</title>
+    <link rel="stylesheet" href="./shared/style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>oklch</h1>
+      <p class="question">
+        One page per function. Each answers one question, and refuses by name
+        when it can't.
+      </p>
+      <p class="contract">
+        Tier 1: one color, or one pair. P3 is first-class and sRGB is the
+        fallback; every gamut-aware tool asks for the gamut and has no default.
+      </p>
+      <ul class="index">
+        <li>
+          <a href="./parse-color/"><code>parseColor</code></a> — What did I
+          type?
+        </li>
+        <li>
+          <a href="./max-chroma/"><code>maxChroma</code></a> — How vivid can
+          this step be?
+        </li>
+        <li>
+          <a href="./in-gamut/"><code>inGamut</code></a> — Is this displayable
+          on this screen?
+        </li>
+        <li>
+          <a href="./gamut-map/"><code>gamutMap</code></a> — Where does it land
+          if not?
+        </li>
+        <li>
+          <a href="./delta-e-ok/"><code>deltaEOK</code></a> — How far is this
+          step from its neighbour?
+        </li>
+        <li>
+          <a href="./contrast-meters/"
+            ><code>contrastWCAG</code> / <code>contrastAPCA</code></a
+          >
+          — What does this pairing measure?
+        </li>
+        <li>
+          <a href="./check-contrast/"><code>checkContrast</code></a> — Does this
+          pairing clear?
+        </li>
+        <li>
+          <a href="./solve-background/"><code>solveBackground</code></a> — How
+          far can the surface move before it stops clearing?
+        </li>
+        <li>
+          <a href="./solve-foreground/"><code>solveForeground</code></a> —
+          What's the nearest ink that clears on this surface?
+        </li>
+        <li>
+          <a href="./rotate-hue/"><code>rotateHue</code></a> — What's this color
+          at another hue?
+        </li>
+        <li>
+          <a href="./harmony/"><code>harmony</code></a> — Which hues are in
+          harmony with this one?
+        </li>
+        <li>
+          <a href="./format-oklch/"><code>formatOklch</code></a> — What does the
+          stylesheet get?
+        </li>
+        <li>
+          <a href="./format-hex/"><code>formatHex</code></a> — What does a
+          hex-only consumer get?
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

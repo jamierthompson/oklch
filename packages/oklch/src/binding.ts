@@ -14,7 +14,7 @@ import {
   type MeterReading,
   type OkLCH,
 } from "./tier1.js";
-import { minPass } from "./tier2.js";
+import { minPass, type RampEnd } from "./tier2.js";
 
 /** A named list of steps the eye placed. */
 export interface Ramp {
@@ -28,13 +28,16 @@ export interface Ramp {
  * With `step`, the token is that step of the ramp, picked by eye. With `on`
  * and `target` as well, the pick is verified against the surface token
  * named, and a pick that fails is refused. Without `step`, the token is
- * solved: the first step of the ramp that clears `target` on `on`.
+ * solved: the first step of the ramp that clears `target` on `on`, walking
+ * from the ramp's first step, or from its last with `from: "end"`.
  */
 export interface Binding {
   /** The semantic role: a CSS identifier such as `surface` or `ink-muted`. */
   readonly token: string;
   readonly ramp: string;
   readonly step?: number;
+  /** For a solve only: which end of the ramp to walk from. Default `"start"`. */
+  readonly from?: RampEnd;
   /** The token this one will sit on. Must already be bound. */
   readonly on?: string;
   readonly target?: ContrastTarget;
@@ -227,6 +230,11 @@ export function resolveBinding(
   };
 
   if (binding.step !== undefined) {
+    if (binding.from !== undefined) {
+      throw new TypeError(
+        `${fn}: token "${token}" picks step ${binding.step} and also says from: "${binding.from}"; \`from\` is for a solve, and a pick has no walk`,
+      );
+    }
     if (
       !Number.isInteger(binding.step) ||
       binding.step < 0 ||
@@ -250,7 +258,9 @@ export function resolveBinding(
   );
   let found;
   try {
-    found = minPass(shipped, surface.fallback.color, binding.target);
+    found = minPass(shipped, surface.fallback.color, binding.target, {
+      from: binding.from ?? "start",
+    });
   } catch (error) {
     throw new RangeError(
       `${fn}: token "${token}" cannot be solved on "${surface.token}": ${error instanceof Error ? error.message : String(error)}`,

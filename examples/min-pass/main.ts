@@ -16,7 +16,7 @@ import {
 const main = page(
   "minPass",
   "Which is the first step that clears on this surface?",
-  "Walks the ramp in order and returns the first step whose pairing clears the target under both standards, with every step's measurement alongside. Throws on an empty ramp rather than returning <code>undefined</code>, and by name when nothing clears.",
+  "Walks the ramp in order and returns the first step whose pairing clears the target under both standards, with every step's measurement alongside — from the first step, or from the last with <code>from: &quot;end&quot;</code>, which is what a dark scheme wants of a ramp listed light to dark. Throws on an empty ramp rather than returning <code>undefined</code>, and by name when nothing clears.",
 );
 const f = form(main);
 const ramp = steps(
@@ -33,6 +33,7 @@ const ramp = steps(
 );
 const bg = field(f, "background", { value: "#ffffff", spellcheck: "false" });
 const target = select(f, "target", Object.keys(CONTRAST_TARGETS));
+const from = select(f, "from", ["start", "end"]);
 
 live(f, out(main), () => {
   const b = color(bg);
@@ -41,6 +42,7 @@ live(f, out(main), () => {
     list,
     b,
     CONTRAST_TARGETS[target.value as keyof typeof CONTRAST_TARGETS],
+    { from: from.value as "start" | "end" },
   );
   const rows = result.checks.map(
     (c, i) => `<tr>

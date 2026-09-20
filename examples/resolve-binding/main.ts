@@ -37,6 +37,7 @@ const step = field(f, "step", {
 });
 const on = field(f, "on", { value: "surface", spellcheck: "false" });
 const scheme = select(f, "scheme", ["light", "dark"]);
+const from = select(f, "from", ["", "start", "end"]);
 const target = select(f, "target", ["", ...Object.keys(CONTRAST_TARGETS)]);
 target.value = "bodyText";
 const gamut = gamutField(f);
@@ -51,6 +52,7 @@ live(f, out(main), () => {
     ramp: ramp.value,
     ...(step.value.trim() === "" ? {} : { step: num(step) }),
     ...(on.value.trim() === "" ? {} : { on: on.value }),
+    ...(from.value === "" ? {} : { from: from.value as "start" | "end" }),
     ...(target.value === ""
       ? {}
       : {

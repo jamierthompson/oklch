@@ -54,18 +54,21 @@ const DARK = [
     ramp: "neutral",
     on: "surface",
     target: CONTRAST_TARGETS.bodyText,
+    from: "end",
   },
   {
     token: "ink-muted",
     ramp: "neutral",
     on: "surface",
     target: CONTRAST_TARGETS.largeText,
+    from: "end",
   },
   {
     token: "accent",
     ramp: "blue",
     on: "surface",
     target: CONTRAST_TARGETS.interfaceElement,
+    from: "end",
   },
 ] as const;
 const SPEC: TokenSetSpec = {
@@ -179,6 +182,15 @@ describe("resolveBinding", () => {
         context,
       ),
     ).toThrow(/sits on "surface", which is not bound yet/);
+  });
+
+  it("refuses `from` on a pick", () => {
+    expect(() =>
+      resolveBinding(
+        { token: "x", ramp: "blue", step: 0, from: "end" },
+        context,
+      ),
+    ).toThrow(/picks step 0 and also says from: "end"; `from` is for a solve/);
   });
 
   it("refuses a surface without a target, a target without a surface, and neither a step nor a pairing", () => {
@@ -323,6 +335,23 @@ describe("buildTokenSet", () => {
     const ink = set.tokens.find((t) => t.token === "ink")!;
     expect(ink.light.step).toBeGreaterThan(3);
     expect(ink.dark.step).toBeLessThan(3);
+  });
+
+  it("walks from the end for a dark scheme, so muted stays muted", () => {
+    const set = buildTokenSet(SPEC);
+    const ink = set.tokens.find((t) => t.token === "ink")!;
+    const muted = set.tokens.find((t) => t.token === "ink-muted")!;
+    expect(muted.dark.step).toBeGreaterThan(ink.dark.step);
+    expect(muted.light.step).toBeLessThan(ink.light.step);
+    const fromStart = buildTokenSet({
+      ...SPEC,
+      dark: DARK.map((b) =>
+        "from" in b ? { ...b, from: "start" as const } : b,
+      ),
+    });
+    expect(
+      fromStart.tokens.find((t) => t.token === "ink-muted")!.dark.step,
+    ).toBe(0);
   });
 
   it("refuses a token bound in only one scheme, by name", () => {

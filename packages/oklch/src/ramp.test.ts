@@ -143,6 +143,32 @@ describe("minPass", () => {
     expect(ui).toBeLessThan(body);
   });
 
+  it("walks from the end on request, and reports the index in the ramp as given", () => {
+    const black = parseColor("#000")!;
+    const fromStart = minPass(BLUES, black, CONTRAST_TARGETS.bodyText);
+    const fromEnd = minPass(BLUES, black, CONTRAST_TARGETS.bodyText, {
+      from: "end",
+    });
+    expect(fromStart.from).toBe("start");
+    expect(fromEnd.from).toBe("end");
+    expect(fromStart.index).toBe(0);
+    expect(fromEnd.index).toBeGreaterThan(fromStart.index);
+    expect(fromEnd.color).toEqual(BLUES[fromEnd.index]);
+    expect(fromEnd.checks).toEqual(fromStart.checks);
+    for (let i = fromEnd.index + 1; i < BLUES.length; i += 1) {
+      expect(fromEnd.checks[i]!.passes).toBe(false);
+    }
+  });
+
+  it("refuses a `from` that is not an end", () => {
+    expect(() =>
+      minPass(BLUES, WHITE, CONTRAST_TARGETS.bodyText, {
+        // @ts-expect-error the contract under test
+        from: "middle",
+      }),
+    ).toThrow(/^minPass: from is middle; pass "start" or "end"/);
+  });
+
   it("throws on an empty ramp rather than returning undefined", () => {
     expect(() => minPass([], WHITE, CONTRAST_TARGETS.bodyText)).toThrow(
       /^minPass: the ramp is empty/,

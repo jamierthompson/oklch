@@ -172,19 +172,30 @@ export function inspectRamp(steps: readonly OkLCH[], gamut: Gamut): RampReport {
   };
 }
 
+/** Which end of the ramp a walk starts from. */
+export type RampEnd = "start" | "end";
+
+export interface MinPassOptions {
+  /** Walk from the first step (`"start"`, the default) or the last (`"end"`). */
+  readonly from?: RampEnd;
+}
+
 export interface MinPass {
-  /** Index of the first step that clears. */
+  /** Index into the ramp, as given, of the first step that clears. */
   readonly index: number;
   readonly color: OkLCH;
   readonly check: ContrastCheck;
   /** Every step's measurement, in ramp order, so the ones that failed are visible too. */
   readonly checks: readonly ContrastCheck[];
+  readonly from: RampEnd;
 }
 
 /**
  * Which is the first step that clears on this surface?
  *
- * Walks the ramp in order and returns the first step whose pairing with
+ * Walks the ramp from `from` — its first step by default, or its last with
+ * `{ from: "end" }`, which is what a dark scheme wants of a ramp listed
+ * light to dark — and returns the first step whose pairing with
  * `background` clears `target` under both standards, with every step's
  * measurement alongside. Throws on an empty ramp rather than returning
  * `undefined`, and by name when no step clears. The meters refuse
@@ -195,19 +206,29 @@ export function minPass(
   ramp: readonly OkLCH[],
   background: OkLCH,
   target: ContrastTarget,
+  options: MinPassOptions = {},
 ): MinPass {
+  const from = options.from ?? "start";
+  if (from !== "start" && from !== "end") {
+    throw new TypeError(
+      `minPass: from is ${String(from)}; pass "start" or "end"`,
+    );
+  }
   if (ramp.length === 0) {
     throw new RangeError(
       "minPass: the ramp is empty; there is no step to clear",
     );
   }
   const checks = ramp.map((step) => checkContrast(step, background, target));
-  const index = checks.findIndex((check) => check.passes);
+  const index =
+    from === "start"
+      ? checks.findIndex((c) => c.passes)
+      : checks.findLastIndex((c) => c.passes);
   if (index === -1) {
     throw new RangeError(
       `minPass: none of the ${ramp.length} steps clears the target ` +
         `(WCAG ${target.wcag}, APCA ${target.apca}) on oklch(${background.L} ${background.C} ${background.H})`,
     );
   }
-  return { index, color: ramp[index]!, check: checks[index]!, checks };
+  return { index, color: ramp[index]!, check: checks[index]!, checks, from };
 }

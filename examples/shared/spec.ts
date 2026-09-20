@@ -52,13 +52,26 @@ export const DEFAULT_SPEC: PageSpec = {
   ],
   dark: [
     { token: "surface", ramp: "neutral", step: 6 },
-    { token: "ink", ramp: "neutral", on: "surface", target: "bodyText" },
-    { token: "ink-muted", ramp: "neutral", on: "surface", target: "largeText" },
+    {
+      token: "ink",
+      ramp: "neutral",
+      on: "surface",
+      target: "bodyText",
+      from: "end",
+    },
+    {
+      token: "ink-muted",
+      ramp: "neutral",
+      on: "surface",
+      target: "largeText",
+      from: "end",
+    },
     {
       token: "accent",
       ramp: "blue",
       on: "surface",
       target: "interfaceElement",
+      from: "end",
     },
   ],
 };

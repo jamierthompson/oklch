@@ -8,7 +8,7 @@ import { TokensPanel } from "@/components/TokensPanel.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useBrands } from "@/hooks/useBrands.ts";
-import { auditOf } from "@/lib/brand.ts";
+import { auditOf } from "@jamiethompson/oklch-brand";
 
 function useSystemScheme() {
   useEffect(() => {

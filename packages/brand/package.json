@@ -1,0 +1,48 @@
+{
+  "name": "@jamiethompson/oklch-brand",
+  "version": "0.0.0",
+  "description": "A brand document for @jamiethompson/oklch: ramps, shadcn roles, the eye's overrides, and a CLI that audits it and ships the theme.",
+  "license": "MIT",
+  "author": "Jamie Thompson",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "oklch-brand": "./dist/bin.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "keywords": [
+    "oklch",
+    "shadcn",
+    "design-tokens",
+    "palette",
+    "cli"
+  ],
+  "dependencies": {
+    "@jamiethompson/oklch": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2"
+  }
+}

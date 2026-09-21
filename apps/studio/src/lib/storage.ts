@@ -1,6 +1,6 @@
 /** Brands live in localStorage; a JSON file is the way out and in. */
 
-import { parse, serialize, type Brand } from "./brand.ts";
+import { parse, serialize, type Brand } from "@jamiethompson/oklch-brand";
 
 const KEY = "oklch-studio/brands";
 

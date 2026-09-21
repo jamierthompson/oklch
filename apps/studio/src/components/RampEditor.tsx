@@ -13,7 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import type { Brand, BrandRamp, RampSeed, Stops } from "@/lib/brand.ts";
+import type {
+  Brand,
+  BrandRamp,
+  RampSeed,
+  Stops,
+} from "@jamiethompson/oklch-brand";
 import { fixed, stopName } from "@/lib/format.ts";
 
 function Field({

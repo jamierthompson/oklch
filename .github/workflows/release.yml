@@ -23,8 +23,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm gate
-      - name: Verify the tag matches the package version
-        run: test "v$(node -p "require('./packages/oklch/package.json').version")" = "$GITHUB_REF_NAME"
+      - name: Verify the tag matches both package versions
+        run: |
+          test "v$(node -p "require('./packages/oklch/package.json').version")" = "$GITHUB_REF_NAME"
+          test "v$(node -p "require('./packages/brand/package.json').version")" = "$GITHUB_REF_NAME"
       - run: npm install -g npm@latest
       - run: npm publish
         working-directory: packages/oklch
+      # pnpm rewrites workspace:* to the published version on publish.
+      - run: pnpm publish --no-git-checks
+        working-directory: packages/brand

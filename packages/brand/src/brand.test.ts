@@ -14,7 +14,7 @@ import {
   withRamp,
   withSeed,
   withStep,
-} from "./brand.ts";
+} from "./brand.js";
 
 const acme = () => newBrand("Acme", "#2563eb", "srgb");
 

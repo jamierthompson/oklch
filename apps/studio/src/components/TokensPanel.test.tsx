@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { TokensPanel } from "./TokensPanel.tsx";
-import { auditOf, newBrand, withOverride, type Brand } from "@/lib/brand.ts";
+import {
+  auditOf,
+  newBrand,
+  withOverride,
+  type Brand,
+} from "@jamiethompson/oklch-brand";
 
 const acme = () => newBrand("Acme", "#2563eb", "srgb");
 const rowOf = (token: string) =>

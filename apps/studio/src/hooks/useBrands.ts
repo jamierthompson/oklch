@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { newBrand, newId, type Brand } from "@/lib/brand.ts";
+import { newBrand, newId, type Brand } from "@jamiethompson/oklch-brand";
 import { load, save, type Stored } from "@/lib/storage.ts";
 
 /** A first brand, so the studio never opens empty. */

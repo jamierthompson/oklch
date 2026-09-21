@@ -106,6 +106,22 @@ by the palette as it stands; and ships the set as shadcn CSS, a `registry:theme`
 item, or DTCG tokens once every pairing clears. Brands persist in the browser
 and travel as JSON files.
 
+## The brand file and the CLI
+
+`@jamiethompson/oklch-brand` is the document the studio edits, as a package:
+the ramps, which ramp plays which role, and the eye's overrides, with pure
+functions from it to bindings, a verdict per token, and the files that ship.
+Save a brand from the studio, commit it next to your app, and let the CLI
+regenerate the theme in CI:
+
+```bash
+pnpm add -D @jamiethompson/oklch-brand
+pnpm oklch-brand check acme.oklch.json          # a verdict per token; exit 1 unless all clear
+pnpm oklch-brand build acme.oklch.json -o src   # acme.css, acme.registry.json, acme.tokens.json
+```
+
+Nothing is written unless every token clears. There is no fallback color.
+
 ## Develop
 
 ```bash
@@ -119,6 +135,7 @@ pnpm gate           # format, lint, typecheck, test, build — what CI runs
 ## Structure
 
 - `packages/oklch` — the library. Its only dependency is colorjs.io.
+- `packages/brand` — the brand document and the `oklch-brand` CLI.
 - `apps/studio` — the brand palette studio: React, Vite, Tailwind v4, shadcn/ui.
 - `examples` — one Vite page per function, each showing when you'd reach for it.
 - `tests` — the architectural test that keeps Tier 2 on Tier 1's public surface.

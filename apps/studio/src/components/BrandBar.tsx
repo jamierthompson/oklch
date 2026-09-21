@@ -10,7 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { newBrand, parse, withGamut, type Brand } from "@/lib/brand.ts";
+import {
+  newBrand,
+  parse,
+  withGamut,
+  type Brand,
+} from "@jamiethompson/oklch-brand";
 import { download, fileName, serialize } from "@/lib/storage.ts";
 
 export function BrandBar({

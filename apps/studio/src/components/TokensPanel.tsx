@@ -31,7 +31,7 @@ import {
   withOverride,
   type Brand,
   type Scheme,
-} from "@/lib/brand.ts";
+} from "@jamiethompson/oklch-brand";
 import { fixed, STOP_NAMES } from "@/lib/format.ts";
 
 function Verdict({ a }: { a: TokenAudit }) {

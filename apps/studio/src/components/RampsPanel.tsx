@@ -18,7 +18,7 @@ import {
   withStep,
   type Brand,
   type ShadcnRole,
-} from "@/lib/brand.ts";
+} from "@jamiethompson/oklch-brand";
 
 const ROLES: readonly ShadcnRole[] = [
   "neutral",

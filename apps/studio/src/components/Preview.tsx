@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cssVarsOf, type Brand, type Scheme } from "@/lib/brand.ts";
+import { cssVarsOf, type Brand, type Scheme } from "@jamiethompson/oklch-brand";
 
 /** Static class names, so Tailwind emits them. */
 const CHART = [

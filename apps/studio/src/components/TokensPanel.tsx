@@ -1,13 +1,9 @@
-import {
-  SHADCN_TOKENS,
-  type TokenAudit,
-  type TokenSetAudit,
-} from "@jamiethompson/oklch";
+import { SHADCN_TOKENS, type TokenSetAudit } from "@jamiethompson/oklch";
 
 import { useState } from "react";
 
 import { Swatch } from "@/components/Swatch.tsx";
-import { Badge } from "@/components/ui/badge";
+import { Verdict } from "@/components/Verdict.tsx";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -32,33 +28,12 @@ import {
   type Brand,
   type Scheme,
 } from "@jamiethompson/oklch-brand";
-import { fixed, STOP_NAMES } from "@/lib/format.ts";
+import { STOP_NAMES } from "@/lib/format.ts";
+import { landedOn, stepKey, type StepRef } from "@/lib/usage.ts";
 
-function Verdict({ a }: { a: TokenAudit }) {
-  const o = a.outcome;
-  if (o.kind === "unresolved") {
-    return (
-      <Badge variant="destructive" title={o.reason}>
-        unresolved
-      </Badge>
-    );
-  }
-  const r = o.kind === "clears" ? o.resolved.receipt : null;
-  if (o.kind === "fails") {
-    return (
-      <Badge variant="destructive" title={`on ${o.on}`}>
-        fails · WCAG {fixed(o.check.wcag.value, 2)} / {o.target.wcag} · APCA{" "}
-        {fixed(o.check.apca.value, 0)} / {o.target.apca}
-      </Badge>
-    );
-  }
-  if (r === null) return <Badge variant="outline">no pairing</Badge>;
-  return (
-    <Badge variant="secondary" title={`on ${r.on}`}>
-      WCAG {fixed(r.wcag.value, 2)} ≥ {r.target.wcag} · APCA{" "}
-      {fixed(r.apca.value, 0)} ≥ {r.target.apca}
-    </Badge>
-  );
+/** The id of a token's cell in one scheme, for scrolling to it. */
+export function tokenCellId(scheme: Scheme, token: string): string {
+  return `token-${scheme}-${token}`;
 }
 
 function Cell({
@@ -66,12 +41,16 @@ function Cell({
   audit,
   scheme,
   token,
+  selection,
+  onLocate,
   onUpdate,
 }: {
   brand: Brand;
   audit: TokenSetAudit;
   scheme: Scheme;
   token: string;
+  selection: StepRef | null;
+  onLocate: (ref: StepRef) => void;
   onUpdate: (b: Brand) => void;
 }) {
   const [note, setNote] = useState<string | null>(null);
@@ -84,6 +63,11 @@ function Cell({
   const override = brand.overrides[scheme][token];
   const solved = binding.step === undefined;
   const stepValue = solved ? "solve" : String(binding.step);
+  const landed = landedOn(a);
+  const onSelected =
+    landed !== null &&
+    selection !== null &&
+    stepKey(landed) === stepKey(selection);
   const rampItems = Object.fromEntries(
     brand.ramps.map((r) => [r.name, r.name]),
   );
@@ -120,13 +104,33 @@ function Cell({
       ),
     );
   const stepLabel = solved
-    ? `solved → ${a.outcome.kind === "unresolved" ? "—" : STOP_NAMES[a.outcome.resolved.step]}`
+    ? `solved → ${landed === null ? "—" : STOP_NAMES[landed.step]}`
     : undefined;
 
   return (
-    <TableCell className="align-top">
+    <TableCell
+      id={tokenCellId(scheme, token)}
+      data-selected={onSelected || undefined}
+      className={
+        "scroll-mt-4 align-top transition-colors" +
+        (onSelected ? " bg-accent/60" : "")
+      }
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <Swatch color={colorOf(a.outcome)} on={surface} />
+        <button
+          type="button"
+          className="rounded-md disabled:cursor-default"
+          disabled={landed === null}
+          aria-label={`show ${scheme} ${token} on its ramp`}
+          title={
+            landed === null
+              ? "No color to show"
+              : `${landed.ramp} ${STOP_NAMES[landed.step]} · show on the ramp`
+          }
+          onClick={() => landed !== null && onLocate(landed)}
+        >
+          <Swatch color={colorOf(a.outcome)} on={surface} />
+        </button>
         <Select
           value={binding.ramp}
           onValueChange={(v) => v !== null && setRamp(v)}
@@ -207,13 +211,23 @@ function Cell({
   );
 }
 
+/**
+ * Every shadcn token in both schemes: where it comes from, its verdict on
+ * its surface, and the eye's way to move it. A token's swatch locates the
+ * step it landed on; cells on the selected step are highlighted.
+ */
 export function TokensPanel({
   brand,
   audit,
+  selection = null,
+  onLocate = () => {},
   onUpdate,
 }: {
   brand: Brand;
   audit: TokenSetAudit;
+  /** The step selected on the ramps, if any. */
+  selection?: StepRef | null;
+  onLocate?: (ref: StepRef) => void;
   onUpdate: (b: Brand) => void;
 }) {
   return (
@@ -231,20 +245,18 @@ export function TokensPanel({
             <TableCell className="align-top font-mono text-xs">
               {token}
             </TableCell>
-            <Cell
-              brand={brand}
-              audit={audit}
-              scheme="light"
-              token={token}
-              onUpdate={onUpdate}
-            />
-            <Cell
-              brand={brand}
-              audit={audit}
-              scheme="dark"
-              token={token}
-              onUpdate={onUpdate}
-            />
+            {(["light", "dark"] as const).map((scheme) => (
+              <Cell
+                key={scheme}
+                brand={brand}
+                audit={audit}
+                scheme={scheme}
+                token={token}
+                selection={selection}
+                onLocate={onLocate}
+                onUpdate={onUpdate}
+              />
+            ))}
           </TableRow>
         ))}
       </TableBody>

@@ -1,7 +1,9 @@
-import { inspectRamp, type OkLCH } from "@jamiethompson/oklch";
+import { inspectRamp, type OkLCH, type TokenAudit } from "@jamiethompson/oklch";
 import { useMemo, useState } from "react";
 
 import { Swatch } from "@/components/Swatch.tsx";
+import { Verdict } from "@/components/Verdict.tsx";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,9 +19,25 @@ import type {
   Brand,
   BrandRamp,
   RampSeed,
+  ShadcnRole,
   Stops,
 } from "@jamiethompson/oklch-brand";
 import { fixed, stopName } from "@/lib/format.ts";
+import { usedBy, type Usage } from "@/lib/usage.ts";
+
+/** The roles a ramp can play, in the order they are offered. */
+export const ROLES: readonly ShadcnRole[] = [
+  "neutral",
+  "primary",
+  "destructive",
+  "secondary",
+  "accent",
+];
+
+/** Which ramp plays this role; `secondary` and `accent` default to the neutral. */
+export function rampOf(brand: Brand, role: ShadcnRole): string {
+  return brand.assignment[role] ?? brand.assignment.neutral;
+}
 
 function Field({
   label,
@@ -66,28 +84,53 @@ function Field({
   );
 }
 
+/** How a token came to sit on this step. */
+function howOf(brand: Brand, a: TokenAudit): "override" | "solved" | "picked" {
+  if (brand.overrides[a.scheme][a.token] !== undefined) return "override";
+  return a.outcome.kind !== "unresolved" && a.outcome.resolved.how === "solved"
+    ? "solved"
+    : "picked";
+}
+
+/**
+ * One ramp: its roles, its steps, and the step the eye has selected, with
+ * every token that lands on that step and each one's verdict on its own
+ * surface. The sliders move the selected step; the seed redraws the ramp.
+ */
 export function RampEditor({
   brand,
   ramp,
+  usage,
+  selected,
+  onSelect,
+  onShowToken,
+  onRole,
   onSeed,
   onStep,
   onRemove,
 }: {
   brand: Brand;
   ramp: BrandRamp;
+  usage: Usage;
+  /** The selected step, when the selection is on this ramp. */
+  selected: number | null;
+  onSelect: (step: number) => void;
+  onShowToken: (a: TokenAudit) => void;
+  /** Give this ramp a role. */
+  onRole: (role: ShadcnRole) => void;
   onSeed: (seed: RampSeed) => void;
   onStep: (index: number, step: OkLCH) => void;
   onRemove: () => void;
 }) {
-  const [selected, setSelected] = useState(5);
   const [error, setError] = useState<string | null>(null);
   const report = useMemo(
     () => inspectRamp(ramp.steps, brand.gamut),
     [ramp.steps, brand.gamut],
   );
-  const step = ramp.steps[selected] ?? ramp.steps[0]!;
-  const inspected = report.steps[selected] ?? report.steps[0]!;
   const seed = ramp.seed;
+  const roles = ROLES.filter((role) => rampOf(brand, role) === ramp.name);
+  const onStepTokens = (i: number) =>
+    usedBy(usage, { ramp: ramp.name, step: i });
 
   const reseed = (next: RampSeed) => {
     try {
@@ -97,27 +140,50 @@ export function RampEditor({
       setError(e instanceof Error ? e.message : String(e));
     }
   };
-  const roles = Object.entries(brand.assignment)
-    .filter(([role, v]) => role !== "charts" && v === ramp.name)
-    .map(([role]) => role);
 
   return (
     <section
-      className="grid gap-3 rounded-lg border p-3"
+      id={`ramp-${ramp.name}`}
+      className="grid scroll-mt-4 gap-3 rounded-lg border p-3"
       aria-label={`ramp ${ramp.name}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="font-medium">
-          {ramp.name}
-          {roles.length > 0 && (
-            <span className="ml-2 text-xs text-muted-foreground">
-              {roles.join(", ")}
-            </span>
-          )}
-        </h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-medium">{ramp.name}</h3>
+        <div
+          className="flex flex-wrap gap-1"
+          role="group"
+          aria-label={`${ramp.name} roles`}
+        >
+          {ROLES.map((role) => {
+            const plays = rampOf(brand, role) === ramp.name;
+            return (
+              <Badge
+                key={role}
+                variant={plays ? "default" : "outline"}
+                className={plays ? "" : "text-muted-foreground"}
+                render={
+                  <button
+                    type="button"
+                    aria-pressed={plays}
+                    aria-label={`${role} role on ${ramp.name}`}
+                    title={
+                      plays
+                        ? `${ramp.name} plays ${role}`
+                        : `Make ${ramp.name} the ${role} ramp`
+                    }
+                    onClick={() => !plays && onRole(role)}
+                  />
+                }
+              >
+                {role}
+              </Badge>
+            );
+          })}
+        </div>
         <Button
           variant="ghost"
           size="sm"
+          className="ml-auto"
           onClick={onRemove}
           disabled={roles.length > 0}
         >
@@ -130,67 +196,67 @@ export function RampEditor({
         role="group"
         aria-label={`${ramp.name} steps`}
       >
-        {ramp.steps.map((s, i) => (
-          <button
-            key={i}
-            type="button"
-            aria-label={`${ramp.name} ${stopName(i)}`}
-            aria-pressed={i === selected}
-            onClick={() => setSelected(i)}
-            className="flex-1"
-          >
-            <Swatch
-              color={s}
-              className={
-                i === selected
-                  ? "w-full ring-2 ring-ring ring-offset-2"
-                  : "w-full"
+        {ramp.steps.map((s, i) => {
+          const tokens = onStepTokens(i);
+          const failing = tokens.some((a) => a.outcome.kind !== "clears");
+          const isSelected = i === selected;
+          return (
+            <button
+              key={i}
+              type="button"
+              aria-label={`${ramp.name} ${stopName(i)}`}
+              aria-pressed={isSelected}
+              title={
+                tokens.length === 0
+                  ? "No token lands here"
+                  : tokens.map((a) => `${a.scheme} ${a.token}`).join("\n")
               }
-            />
-            <span className="block text-center text-[10px] text-muted-foreground">
-              {stopName(i)}
-            </span>
-          </button>
-        ))}
+              onClick={() => onSelect(i)}
+              className="min-w-0 flex-1"
+            >
+              <Swatch
+                color={s}
+                className={
+                  isSelected
+                    ? "w-full ring-2 ring-ring ring-offset-2 ring-offset-background"
+                    : failing
+                      ? "w-full ring-2 ring-destructive ring-offset-1 ring-offset-background"
+                      : "w-full"
+                }
+              />
+              <span className="block text-center text-[10px] text-muted-foreground">
+                {stopName(i)}
+              </span>
+              <span
+                className={
+                  "block min-h-3.5 text-center text-[10px] " +
+                  (failing ? "text-destructive" : "text-muted-foreground")
+                }
+                aria-label={
+                  tokens.length === 0
+                    ? `no token on ${ramp.name} ${stopName(i)}`
+                    : `${tokens.length} token${tokens.length === 1 ? "" : "s"} on ${ramp.name} ${stopName(i)}`
+                }
+              >
+                {tokens.length > 0 ? tokens.length : " "}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="grid gap-2">
-        <div className="text-xs text-muted-foreground">
-          step {stopName(selected)} · chroma{" "}
-          {fixed(inspected.chromaShare * 100, 0)}% of what {brand.gamut} allows
-          {inspected.onCusp ? " · on the cusp" : ""}
-          {inspected.map.moved
-            ? ` · mapped into ${brand.gamut}, ΔE ${fixed(inspected.map.deltaEOK)}`
-            : ""}
-          {" · on white "}WCAG {fixed(inspected.contrast.onWhite.wcag, 2)} · on
-          black {fixed(inspected.contrast.onBlack.wcag, 2)}
-        </div>
-        <Field
-          label="L"
-          value={step.L}
-          min={0}
-          max={1}
-          step={0.001}
-          onChange={(L) => onStep(selected, { ...step, L })}
+      {selected !== null && ramp.steps[selected] !== undefined && (
+        <StepDetail
+          brand={brand}
+          ramp={ramp}
+          index={selected}
+          step={ramp.steps[selected]}
+          inspected={report.steps[selected]!}
+          tokens={onStepTokens(selected)}
+          onShowToken={onShowToken}
+          onStep={onStep}
         />
-        <Field
-          label="C"
-          value={step.C}
-          min={0}
-          max={0.4}
-          step={0.001}
-          onChange={(C) => onStep(selected, { ...step, C })}
-        />
-        <Field
-          label="H"
-          value={step.H}
-          min={0}
-          max={360}
-          step={0.1}
-          digits={1}
-          onChange={(H) => onStep(selected, { ...step, H })}
-        />
-      </div>
+      )}
 
       <details className="grid gap-2 text-sm">
         <summary className="cursor-pointer text-muted-foreground">
@@ -292,5 +358,88 @@ export function RampEditor({
         </div>
       </details>
     </section>
+  );
+}
+
+/** The selected step: what it measures, the sliders that move it, and the tokens that land on it. */
+function StepDetail({
+  brand,
+  ramp,
+  index,
+  step,
+  inspected,
+  tokens,
+  onShowToken,
+  onStep,
+}: {
+  brand: Brand;
+  ramp: BrandRamp;
+  index: number;
+  step: OkLCH;
+  inspected: ReturnType<typeof inspectRamp>["steps"][number];
+  tokens: readonly TokenAudit[];
+  onShowToken: (a: TokenAudit) => void;
+  onStep: (index: number, step: OkLCH) => void;
+}) {
+  return (
+    <div className="grid gap-2" aria-label={`${ramp.name} ${stopName(index)}`}>
+      <div className="text-xs text-muted-foreground">
+        step {stopName(index)} · chroma {fixed(inspected.chromaShare * 100, 0)}%
+        of what {brand.gamut} allows
+        {inspected.onCusp ? " · on the cusp" : ""}
+        {inspected.map.moved
+          ? ` · mapped into ${brand.gamut}, ΔE ${fixed(inspected.map.deltaEOK)}`
+          : ""}
+      </div>
+      <Field
+        label="L"
+        value={step.L}
+        min={0}
+        max={1}
+        step={0.001}
+        onChange={(L) => onStep(index, { ...step, L })}
+      />
+      <Field
+        label="C"
+        value={step.C}
+        min={0}
+        max={0.4}
+        step={0.001}
+        onChange={(C) => onStep(index, { ...step, C })}
+      />
+      <Field
+        label="H"
+        value={step.H}
+        min={0}
+        max={360}
+        step={0.1}
+        digits={1}
+        onChange={(H) => onStep(index, { ...step, H })}
+      />
+      <div className="grid gap-1" aria-label="tokens on this step">
+        <div className="text-xs text-muted-foreground">
+          {tokens.length === 0
+            ? "No token lands on this step."
+            : `On this step, measured where each token sits:`}
+        </div>
+        {tokens.map((a) => (
+          <div
+            key={`${a.scheme}/${a.token}`}
+            className="flex flex-wrap items-center gap-2 text-xs"
+          >
+            <button
+              type="button"
+              className="font-mono underline-offset-4 hover:underline"
+              title="Show this token in the table"
+              onClick={() => onShowToken(a)}
+            >
+              {a.scheme} · {a.token}
+            </button>
+            <span className="text-muted-foreground">{howOf(brand, a)}</span>
+            <Verdict a={a} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

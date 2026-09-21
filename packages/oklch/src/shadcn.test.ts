@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { CONTRAST_TARGETS } from "./tier1.js";
+import { CONTRAST_TARGETS, formatOklch } from "./tier1.js";
 import { createRamp, TAILWIND_STOPS } from "./tier2.js";
 import { auditTokenSet } from "./audit.js";
 import { buildTokenSet, type Ramp } from "./binding.js";
-import { SHADCN_TOKENS, shadcnBindings } from "./shadcn.js";
+import {
+  SHADCN_TOKENS,
+  shadcnBindings,
+  tokenSetToRegistryItem,
+  tokenSetToShadcnCss,
+} from "./shadcn.js";
 
 const ramp = (
   name: string,
@@ -188,6 +193,132 @@ describe("shadcnBindings", () => {
       shadcnBindings(ASSIGNMENT, [RAMPS[0]!, short, RAMPS[2]!]),
     ).toThrow(
       /^shadcnBindings: ramp "blue" has 7 steps; the preset picks by Tailwind's eleven stops/,
+    );
+  });
+});
+
+describe("tokenSetToShadcnCss", () => {
+  const set = () =>
+    buildTokenSet({
+      ramps: RAMPS,
+      gamut: "srgb",
+      ...shadcnBindings(ASSIGNMENT, RAMPS),
+    });
+
+  it("emits :root, .dark, and @theme inline, one line per token, in binding order", () => {
+    const css = tokenSetToShadcnCss(set());
+    const blocks = css.split("\n\n");
+    expect(blocks).toHaveLength(3);
+    expect(blocks[0]).toMatch(/^:root \{\n {2}--background: oklch\(/);
+    expect(blocks[1]).toMatch(/^\.dark \{\n {2}--background: oklch\(/);
+    expect(blocks[2]).toMatch(
+      /^@theme inline \{\n {2}--color-background: var\(--background\);\n {2}--color-foreground: var\(--foreground\);/,
+    );
+    expect(css.endsWith("}\n")).toBe(true);
+    for (const token of SHADCN_TOKENS) {
+      expect(
+        css.match(new RegExp(`^  --${token}: oklch\\(`, "gm")),
+      ).toHaveLength(2);
+      expect(css).toContain(`--color-${token}: var(--${token});`);
+    }
+    expect(css).not.toContain("@media");
+    expect(css).not.toContain("--radius");
+  });
+
+  it("ships each scheme's sRGB fallback at full precision", () => {
+    const s = set();
+    const css = tokenSetToShadcnCss(s);
+    const primary = s.tokens.find((t) => t.token === "primary")!;
+    expect(css).toContain(
+      `--primary: ${formatOklch(primary.light.fallback.color)};`,
+    );
+    expect(css).toContain(
+      `--primary: ${formatOklch(primary.dark.fallback.color)};`,
+    );
+  });
+
+  it("carries a radius on :root when asked", () => {
+    expect(tokenSetToShadcnCss(set(), { radius: "0.625rem" })).toMatch(
+      /^:root \{\n {2}--radius: 0.625rem;\n {2}--background/,
+    );
+  });
+
+  it("redeclares only the tokens P3 moves, under the media query, for a P3 set", () => {
+    const vivid = [
+      ramp("gray", 260, 0.05, TAILWIND_STOPS.neutral),
+      {
+        name: "blue",
+        steps: createRamp({ hue: 260, saturation: 1, gamut: "p3" }).steps,
+      },
+      {
+        name: "red",
+        steps: createRamp({ hue: 25, saturation: 1, gamut: "p3" }).steps,
+      },
+    ];
+    const s = buildTokenSet({
+      ramps: vivid,
+      gamut: "p3",
+      ...shadcnBindings(ASSIGNMENT, vivid),
+    });
+    const css = tokenSetToShadcnCss(s);
+    const media = css.slice(css.indexOf("@media (color-gamut: p3)"));
+    expect(media).toMatch(
+      /^@media \(color-gamut: p3\) \{\n {2}:root \{\n {4}--/,
+    );
+    expect(media).toContain("\n  .dark {\n");
+    const moved = s.tokens.filter((t) => t.light.fallback.moved);
+    expect(moved.length).toBeGreaterThan(0);
+    expect(moved.map((t) => t.token)).toContain("primary");
+    expect(moved.map((t) => t.token)).not.toContain("background");
+    expect(media.match(/^ {4}--[a-z0-9-]+:/gm)).toHaveLength(
+      moved.length + s.tokens.filter((t) => t.dark.fallback.moved).length,
+    );
+  });
+});
+
+describe("tokenSetToRegistryItem", () => {
+  const set = () =>
+    buildTokenSet({
+      ramps: RAMPS,
+      gamut: "srgb",
+      ...shadcnBindings(ASSIGNMENT, RAMPS),
+    });
+
+  it("is a registry:theme item with every token under light and dark, as sRGB oklch()", () => {
+    const s = set();
+    const item = tokenSetToRegistryItem(s, {
+      name: "acme",
+      title: "Acme",
+      description: "Acme's palette.",
+    });
+    expect(item.$schema).toBe(
+      "https://ui.shadcn.com/schema/registry-item.json",
+    );
+    expect(item.type).toBe("registry:theme");
+    expect(item.name).toBe("acme");
+    expect(item.title).toBe("Acme");
+    expect(item.description).toBe("Acme's palette.");
+    expect(Object.keys(item.cssVars.light)).toEqual([...SHADCN_TOKENS]);
+    expect(Object.keys(item.cssVars.dark)).toEqual([...SHADCN_TOKENS]);
+    const primary = s.tokens.find((t) => t.token === "primary")!;
+    expect(item.cssVars.light["primary"]).toBe(
+      formatOklch(primary.light.fallback.color),
+    );
+    expect(item.cssVars.dark["primary"]).toBe(
+      formatOklch(primary.dark.fallback.color),
+    );
+    expect(JSON.parse(JSON.stringify(item))).toEqual(item);
+  });
+
+  it("leaves out a title and description that were not given", () => {
+    const item = tokenSetToRegistryItem(set(), { name: "acme" });
+    expect("title" in item).toBe(false);
+    expect("description" in item).toBe(false);
+  });
+
+  it("refuses a name the registry would", () => {
+    expect(() => tokenSetToRegistryItem(set(), { name: "Acme Theme" })).toThrow(
+      /^tokenSetToRegistryItem: name "Acme Theme" is not kebab-case/,
     );
   });
 });

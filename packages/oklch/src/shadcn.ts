@@ -1,11 +1,17 @@
 /**
  * Tier 3: the shadcn/ui token shape. Which ramps play which roles, bound
  * in the order shadcn's variables depend on each other, with the contrast
- * bar each pairing must clear.
+ * bar each pairing must clear; and what the set ships as, for shadcn.
  */
 
-import { CONTRAST_TARGETS } from "./tier1.js";
-import type { Binding, Ramp, Scheme } from "./binding.js";
+import { CONTRAST_TARGETS, formatOklch, type OkLCH } from "./tier1.js";
+import type {
+  Binding,
+  Ramp,
+  ResolvedToken,
+  Scheme,
+  TokenSet,
+} from "./binding.js";
 
 /**
  * shadcn/ui's base color variables, in dependency order: every surface
@@ -226,4 +232,126 @@ export function shadcnBindings(
   };
 
   return { light: scheme("light"), dark: scheme("dark") };
+}
+
+export interface ShadcnCssOptions {
+  /** Emitted as `--radius` on `:root`, since a pasted block replaces the one holding it. Default none. */
+  readonly radius?: string;
+}
+
+function declarations(
+  set: TokenSet,
+  pick: (t: ResolvedToken) => OkLCH,
+  scheme: Scheme,
+): string[] {
+  return set.tokens.map(
+    (t) => `--${t.token}: ${formatOklch(pick(t[scheme]))};`,
+  );
+}
+
+function cssBlock(selector: string, lines: string[], indent = ""): string {
+  return `${indent}${selector} {\n${lines.map((l) => `${indent}  ${l}`).join("\n")}\n${indent}}`;
+}
+
+/**
+ * What does this ship as, for shadcn/ui?
+ *
+ * The three blocks shadcn's `globals.css` holds: every token on `:root`
+ * for light, the same names on `.dark`, and `@theme inline` mapping each
+ * to `--color-<token>` so the Tailwind utilities exist. Values are the sRGB
+ * fallbacks at full precision. When the set was built for P3, every token
+ * whose P3 color differs from its fallback in a scheme is redeclared under
+ * `@media (color-gamut: p3)`. The `@custom-variant dark` line and the
+ * Tailwind import stay in the file this is pasted into; they are written
+ * once by `shadcn init`, not per theme.
+ */
+export function tokenSetToShadcnCss(
+  set: TokenSet,
+  options: ShadcnCssOptions = {},
+): string {
+  const fallback = (t: ResolvedToken): OkLCH => t.fallback.color;
+  const shipped = (t: ResolvedToken): OkLCH => t.color;
+  const radius =
+    options.radius === undefined ? [] : [`--radius: ${options.radius};`];
+  const theme = set.tokens.map((t) => `--color-${t.token}: var(--${t.token});`);
+  let css =
+    cssBlock(":root", [...radius, ...declarations(set, fallback, "light")]) +
+    "\n\n" +
+    cssBlock(".dark", declarations(set, fallback, "dark")) +
+    "\n\n" +
+    cssBlock("@theme inline", theme) +
+    "\n";
+  if (set.gamut === "p3") {
+    const p3 = (scheme: Scheme): string[] =>
+      set.tokens
+        .filter((t) => t[scheme].fallback.moved)
+        .map((t) => `--${t.token}: ${formatOklch(shipped(t[scheme]))};`);
+    const light = p3("light");
+    const dark = p3("dark");
+    if (light.length > 0 || dark.length > 0) {
+      const blocks = [
+        ...(light.length > 0 ? [cssBlock(":root", light, "  ")] : []),
+        ...(dark.length > 0 ? [cssBlock(".dark", dark, "  ")] : []),
+      ];
+      css += `\n@media (color-gamut: p3) {\n${blocks.join("\n\n")}\n}\n`;
+    }
+  }
+  return css;
+}
+
+export interface RegistryItemOptions {
+  /** The item's name: what `npx shadcn add` installs it as. A kebab-case identifier. */
+  readonly name: string;
+  readonly title?: string;
+  readonly description?: string;
+}
+
+/** A shadcn registry item of type `registry:theme`. */
+export interface RegistryItem {
+  readonly $schema: "https://ui.shadcn.com/schema/registry-item.json";
+  readonly name: string;
+  readonly type: "registry:theme";
+  readonly title?: string;
+  readonly description?: string;
+  readonly cssVars: {
+    readonly light: { readonly [token: string]: string };
+    readonly dark: { readonly [token: string]: string };
+  };
+}
+
+const REGISTRY_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * What does this ship as, for a shadcn registry?
+ *
+ * A `registry:theme` item: one entry per token under `cssVars.light` and
+ * `cssVars.dark`, each an `oklch()` of the sRGB fallback at full
+ * precision. The format has no slot for a P3 value, so a set built for P3
+ * ships its fallbacks here and its P3 overrides only through
+ * `tokenSetToShadcnCss`. Installed with `npx shadcn add <url>`. Refuses a
+ * name that is not kebab-case, since the registry would.
+ */
+export function tokenSetToRegistryItem(
+  set: TokenSet,
+  options: RegistryItemOptions,
+): RegistryItem {
+  if (!REGISTRY_NAME.test(options.name)) {
+    throw new TypeError(
+      `tokenSetToRegistryItem: name "${options.name}" is not kebab-case (lowercase letters, digits, single hyphens); the registry refuses anything else`,
+    );
+  }
+  const vars = (scheme: Scheme): { [token: string]: string } =>
+    Object.fromEntries(
+      set.tokens.map((t) => [t.token, formatOklch(t[scheme].fallback.color)]),
+    );
+  return {
+    $schema: "https://ui.shadcn.com/schema/registry-item.json",
+    name: options.name,
+    type: "registry:theme",
+    ...(options.title === undefined ? {} : { title: options.title }),
+    ...(options.description === undefined
+      ? {}
+      : { description: options.description }),
+    cssVars: { light: vars("light"), dark: vars("dark") },
+  };
 }

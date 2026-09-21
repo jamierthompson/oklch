@@ -6,12 +6,14 @@
  * clamps, rounds, or falls back.
  *
  * Tier 1 answers about one color or one pair. Tier 2 answers about a list
- * of steps. Tier 3 binds steps to semantic roles and ships them. Each tier
- * is built from the public surface of the tiers below it alone — an
- * architectural test enforces it.
+ * of steps, and drafts one. Tier 3 binds steps to semantic roles, audits
+ * them, and ships them. Each tier is built from the public surface of the
+ * tiers below it alone — an architectural test enforces it.
  */
 
 export * from "./tier1.js";
 export * from "./tier2.js";
 export * from "./binding.js";
+export * from "./audit.js";
+export * from "./shadcn.js";
 export * from "./export.js";

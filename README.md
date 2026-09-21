@@ -43,6 +43,19 @@ architectural test in `tests/` fails if it imports anything else.
 | `createScale(options)`      | Equal steps in data → equal perceived steps? (for data, not palettes)   |
 | `createRamp(options)`       | A ramp to start from: a draft through a hue or a brand color, in gamut  |
 
+Tier 3: a whole system. Steps bound to semantic roles, with a receipt per
+pairing, and shipped.
+
+| Function                            | The question it answers                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------ |
+| `resolveBinding(binding, context)`  | Bind one token: pick a step by eye, or solve for the first that clears.  |
+| `buildTokenSet(spec)`               | Bind these ramps to these roles, in both schemes: a set, or a refusal.   |
+| `auditTokenSet(spec)`               | Every token's verdict, without a refusal ending the walk. For an editor. |
+| `shadcnBindings(assignment, ramps)` | shadcn/ui's variables bound to these ramps, in both schemes.             |
+| `tokenSetToDeclarations(set)`       | What does this ship as, in plain CSS?                                    |
+| `tokenSetToTailwindTheme(set)`      | What does this ship as, for Tailwind v4?                                 |
+| `tokenSetToDesignTokens(set)`       | What does this ship as, for a token pipeline?                            |
+
 ```ts
 import {
   CONTRAST_TARGETS,

@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
  * guarantee is a test, not a diagram.
  */
 const TIER_2 = ["ramp.ts", "scale.ts", "generate.ts"];
-const TIER_3 = ["binding.ts", "export.ts"];
+const TIER_3 = ["binding.ts", "export.ts", "audit.ts", "shadcn.ts"];
 const IMPORT = /^\s*(?:import|export)[\s\S]*?from\s+["']([^"']+)["']/gm;
 
 const src = join(import.meta.dirname, "..", "packages", "oklch", "src");

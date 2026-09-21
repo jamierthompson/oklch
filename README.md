@@ -41,6 +41,7 @@ architectural test in `tests/` fails if it imports anything else.
 | `inspectRamp(steps, gamut)` | What does each step I placed measure, and how do the neighbours relate? |
 | `minPass(ramp, bg, target)` | Which is the first step that clears on this surface?                    |
 | `createScale(options)`      | Equal steps in data → equal perceived steps? (for data, not palettes)   |
+| `createRamp(options)`       | A ramp to start from: a draft through a hue or a brand color, in gamut  |
 
 ```ts
 import {

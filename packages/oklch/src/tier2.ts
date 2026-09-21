@@ -2,3 +2,4 @@
 
 export * from "./ramp.js";
 export * from "./scale.js";
+export * from "./generate.js";

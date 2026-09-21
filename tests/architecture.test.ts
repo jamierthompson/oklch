@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
  * else, the public API would be incomplete, and that is a bug — so the
  * guarantee is a test, not a diagram.
  */
-const TIER_2 = ["ramp.ts", "scale.ts"];
+const TIER_2 = ["ramp.ts", "scale.ts", "generate.ts"];
 const TIER_3 = ["binding.ts", "export.ts"];
 const IMPORT = /^\s*(?:import|export)[\s\S]*?from\s+["']([^"']+)["']/gm;
 

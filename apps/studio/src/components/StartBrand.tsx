@@ -4,13 +4,13 @@ import { useRef, useState } from "react";
 import { SeedPicker } from "@/components/SeedPicker.tsx";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -21,8 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-/** The studio's first screen, and the one behind "New brand": nothing exists until you start it. */
-export function Welcome({
+/** The studio's empty state, and what "New brand" opens: nothing exists until you start it. */
+export function StartBrand({
   onCreate,
   onCancel,
 }: {
@@ -54,36 +54,43 @@ export function Welcome({
   };
 
   return (
-    <div className="grid min-h-[70vh] place-items-center p-4">
-      <Card className="w-full max-w-xl">
-        <CardHeader>
-          <CardTitle>Start a brand</CardTitle>
-          <CardDescription>
-            One color in. The studio drafts a tinted neutral, the brand ramp
-            through it, and a red, binds every shadcn token, and shows you what
-            clears. Every step stays yours to move.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
+    <Empty className="min-h-[60vh] border border-dashed">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <span
+            aria-hidden
+            className="block size-6 rounded-full bg-[conic-gradient(in_oklch_longer_hue,oklch(0.7_0.15_0),oklch(0.7_0.15_360))]"
+          />
+        </EmptyMedia>
+        <EmptyTitle>No brand yet</EmptyTitle>
+        <EmptyDescription>
+          Pick a color to start from, or type your own. The studio drafts a
+          tinted neutral, the brand ramp through it, and a red, binds every
+          shadcn token, and shows you what clears. Every step stays yours to
+          move.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent className="max-w-lg gap-4">
+        <SeedPicker value={seed} onChange={setSeed} />
+        <div className="flex flex-wrap items-end gap-3">
           <div className="grid gap-1">
             <Label htmlFor="brand-name">Name</Label>
             <Input
               id="brand-name"
-              className="w-64"
+              className="w-48"
               placeholder="Acme"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && create()}
             />
           </div>
-          <SeedPicker value={seed} onChange={setSeed} />
           <div className="grid gap-1">
             <Label>Gamut</Label>
             <Select
               value={gamut}
               onValueChange={(v) => v !== null && setGamut(v as Brand["gamut"])}
             >
-              <SelectTrigger aria-label="Gamut" className="w-32">
+              <SelectTrigger aria-label="Gamut" className="w-28">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -92,11 +99,9 @@ export function Welcome({
               </SelectContent>
             </Select>
           </div>
-          {error !== null && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-        </CardContent>
-        <CardFooter className="flex flex-wrap gap-2">
+        </div>
+        {error !== null && <p className="text-sm text-destructive">{error}</p>}
+        <div className="flex flex-wrap justify-center gap-2">
           <Button onClick={create} disabled={seed.trim() === ""}>
             Create
           </Button>
@@ -115,8 +120,8 @@ export function Welcome({
               Cancel
             </Button>
           )}
-        </CardFooter>
-      </Card>
-    </div>
+        </div>
+      </EmptyContent>
+    </Empty>
   );
 }

@@ -24,7 +24,7 @@ export function BrandBar({
   onRemove,
 }: {
   brands: readonly Brand[];
-  brand: Brand;
+  brand: Brand | null;
   onSelect: (id: string) => void;
   onUpdate: (b: Brand) => void;
   onAdd: (b: Brand) => void;
@@ -48,6 +48,35 @@ export function BrandBar({
   };
 
   const items = Object.fromEntries(brands.map((b) => [b.id, b.name]));
+  const fileInput = (
+    <input
+      ref={file}
+      type="file"
+      accept="application/json,.json"
+      className="hidden"
+      onChange={(e) => void importFile(e.target.files?.[0])}
+    />
+  );
+
+  if (brand === null) {
+    return (
+      <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+        <h1 className="font-semibold">oklch studio</h1>
+        <span className="text-sm text-muted-foreground">
+          No brands on this machine yet.
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => file.current?.click()}
+        >
+          Open file
+        </Button>
+        {fileInput}
+        {error !== null && <p className="text-sm text-destructive">{error}</p>}
+      </header>
+    );
+  }
 
   return (
     <header className="flex flex-wrap items-end gap-3 border-b px-4 py-3">
@@ -105,13 +134,7 @@ export function BrandBar({
           <Button variant="outline" onClick={() => file.current?.click()}>
             Open file
           </Button>
-          <input
-            ref={file}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={(e) => void importFile(e.target.files?.[0])}
-          />
+          {fileInput}
           <Button variant="destructive" onClick={onRemove}>
             Delete
           </Button>

@@ -5,7 +5,7 @@ test("a brand color becomes a shadcn theme with every token clearing", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByText("Start a brand")).toBeVisible();
+  await expect(page.getByText("No brand yet")).toBeVisible();
 
   await page.getByLabel("Name", { exact: true }).fill("Amber Co");
   await page.getByLabel("Or your own color").fill("#f59e0b");

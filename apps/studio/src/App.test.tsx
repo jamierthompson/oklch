@@ -10,11 +10,12 @@ describe("App", () => {
 
   it("opens empty, with the seed colors and nothing created", () => {
     render(<App />);
-    expect(screen.getByText("Start a brand")).toBeInTheDocument();
+    expect(screen.getByText("No brand yet")).toBeInTheDocument();
     for (const s of SEEDS)
       expect(screen.getByRole("button", { name: s.name })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
     expect(screen.queryByTestId("preview-light")).not.toBeInTheDocument();
+    expect(screen.getByTestId("preview-empty")).toBeInTheDocument();
     expect(localStorage.getItem("oklch-studio/brands")).toContain(
       '"brands":[]',
     );
@@ -46,6 +47,6 @@ describe("App", () => {
     await userEvent.type(screen.getByLabelText("Or your own color"), "blueish");
     await userEvent.click(screen.getByRole("button", { name: "Create" }));
     expect(screen.getByText(/"blueish" is not a color/)).toBeInTheDocument();
-    expect(screen.getByText("Start a brand")).toBeInTheDocument();
+    expect(screen.getByText("No brand yet")).toBeInTheDocument();
   });
 });

@@ -1,14 +1,15 @@
-import { useEffect, useMemo } from "react";
+import { auditOf } from "@jamiethompson/oklch-brand";
+import { useEffect, useMemo, useState } from "react";
 
 import { BrandBar } from "@/components/BrandBar.tsx";
 import { ExportPanel } from "@/components/ExportPanel.tsx";
 import { Preview } from "@/components/Preview.tsx";
 import { RampsPanel } from "@/components/RampsPanel.tsx";
 import { TokensPanel } from "@/components/TokensPanel.tsx";
+import { Welcome } from "@/components/Welcome.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useBrands } from "@/hooks/useBrands.ts";
-import { auditOf } from "@jamiethompson/oklch-brand";
 
 function useSystemScheme() {
   useEffect(() => {
@@ -24,7 +25,28 @@ function useSystemScheme() {
 export function App() {
   useSystemScheme();
   const { brands, brand, update, select, add, duplicate, remove } = useBrands();
-  const audit = useMemo(() => auditOf(brand), [brand]);
+  const [creating, setCreating] = useState(false);
+  const audit = useMemo(
+    () => (brand === null ? null : auditOf(brand)),
+    [brand],
+  );
+
+  if (brand === null || audit === null || creating) {
+    return (
+      <TooltipProvider>
+        <div className="min-h-screen bg-background text-foreground">
+          <Welcome
+            onCreate={(b) => {
+              add(b);
+              setCreating(false);
+            }}
+            {...(brand === null ? {} : { onCancel: () => setCreating(false) })}
+          />
+        </div>
+      </TooltipProvider>
+    );
+  }
+
   const failing = [...audit.light, ...audit.dark].filter(
     (a) => a.outcome.kind !== "clears",
   ).length;
@@ -38,6 +60,7 @@ export function App() {
           onSelect={select}
           onUpdate={update}
           onAdd={add}
+          onNew={() => setCreating(true)}
           onDuplicate={duplicate}
           onRemove={remove}
         />

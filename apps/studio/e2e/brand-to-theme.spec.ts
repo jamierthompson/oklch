@@ -5,9 +5,10 @@ test("a brand color becomes a shadcn theme with every token clearing", async ({
   page,
 }) => {
   await page.goto("/");
+  await expect(page.getByText("Start a brand")).toBeVisible();
 
-  await page.getByPlaceholder("Name", { exact: true }).fill("Amber Co");
-  await page.getByLabel("Seed color").fill("#f59e0b");
+  await page.getByLabel("Name", { exact: true }).fill("Amber Co");
+  await page.getByLabel("Or your own color").fill("#f59e0b");
   await page.getByRole("button", { name: "Create" }).click();
   await expect(page.getByLabel("Brand name")).toHaveValue("Amber Co");
 
@@ -37,6 +38,12 @@ test("a step moved off the bar is shown failing, and export waits", async ({
   page,
 }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "Ocean" }).click();
+  await expect(page.getByRole("button", { name: "Ocean" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: "Create" }).click();
   await page.getByRole("tab", { name: "Tokens" }).click();
 
   await page.getByRole("combobox", { name: "light primary step" }).click();

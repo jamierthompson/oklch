@@ -10,12 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  newBrand,
-  parse,
-  withGamut,
-  type Brand,
-} from "@jamiethompson/oklch-brand";
+import { parse, withGamut, type Brand } from "@jamiethompson/oklch-brand";
 import { download, fileName, serialize } from "@/lib/storage.ts";
 
 export function BrandBar({
@@ -24,6 +19,7 @@ export function BrandBar({
   onSelect,
   onUpdate,
   onAdd,
+  onNew,
   onDuplicate,
   onRemove,
 }: {
@@ -32,23 +28,12 @@ export function BrandBar({
   onSelect: (id: string) => void;
   onUpdate: (b: Brand) => void;
   onAdd: (b: Brand) => void;
+  onNew: () => void;
   onDuplicate: () => void;
   onRemove: () => void;
 }) {
-  const [seed, setSeed] = useState("#2563eb");
-  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
-
-  const create = () => {
-    try {
-      onAdd(newBrand(name.trim() || "Untitled", seed.trim(), brand.gamut));
-      setName("");
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
 
   const importFile = async (f: File | undefined) => {
     if (f === undefined) return;
@@ -105,6 +90,7 @@ export function BrandBar({
               <SelectItem value="p3">p3</SelectItem>
             </SelectContent>
           </Select>
+          <Button onClick={onNew}>New brand</Button>
           <Button variant="outline" onClick={onDuplicate}>
             Duplicate
           </Button>
@@ -129,26 +115,6 @@ export function BrandBar({
           <Button variant="destructive" onClick={onRemove}>
             Delete
           </Button>
-        </div>
-      </div>
-      <div className="grid gap-1">
-        <Label htmlFor="new-brand">New brand from a color</Label>
-        <div className="flex gap-2">
-          <Input
-            id="new-brand"
-            className="w-36"
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Input
-            aria-label="Seed color"
-            className="w-40 font-mono"
-            value={seed}
-            onChange={(e) => setSeed(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && create()}
-          />
-          <Button onClick={create}>Create</Button>
         </div>
       </div>
       {error !== null && <p className="text-sm text-destructive">{error}</p>}

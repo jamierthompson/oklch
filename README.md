@@ -99,7 +99,8 @@ See [docs/concepts/architecture.md](docs/concepts/architecture.md).
 ## The studio
 
 `apps/studio` is the tool the library exists for: a brand color in, shadcn's
-theme out, with every step still the eye's to move. It drafts a tinted neutral,
+theme out, with every step still the eye's to move. It opens empty: pick one of
+a few seed colors or type your own, and it drafts a tinted neutral,
 the brand ramp through the color, and a red; binds all 31 shadcn variables;
 shows a verdict per token in both schemes, with real shadcn components skinned
 by the palette as it stands; and ships the set as shadcn CSS, a `registry:theme`

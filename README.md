@@ -5,6 +5,9 @@ Every function refuses by name, reports what moved, and never clamps, rounds, or
 falls back.
 
 colorjs.io does the math. This package decides what the math is allowed to say.
+It drafts a ramp the eye then moves, binds the steps to the roles a system
+needs — shadcn/ui's, out of the box — and gives every pairing a verdict with its
+standard named. It never signs off.
 
 ## Install
 

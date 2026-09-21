@@ -7,26 +7,36 @@ colorjs.io does the math. This package decides what the math is allowed to say.
 
 A generator can't know what yellow-500 should look like. An eye can. The
 library's job is to make the eye faster and its calls measurable, never to sign
-off. So nothing here generates a palette, picks a preset, or declares a pairing
-fine. Every function answers one question about one color or one pair, and
-answers it with a report.
+off. So the package drafts a ramp the eye then moves, binds the steps the eye
+chose to the roles a system needs, and measures every pairing — but it never
+declares one fine. A draft is steps, nothing more; a preset is bindings, nothing
+more; every verdict is a report with its standard named. Nothing here signs off.
 
 ## Three tiers
 
 **Tier 1 — one color or one pair.** Parse, gamut, distance, contrast, the two
 solvers, hue, format. This is the whole package today.
 
-**Tier 2 — a list of steps.** `inspectRamp` measures a ramp the eye placed —
-nothing is generated. `minPass` finds the first step that clears a surface.
-`createScale` is the one continuous thing, for data rather than palettes. Built
-from Tier 1's public surface only; `tests/architecture.test.ts` reads the Tier 2
-sources and fails if they import anything else.
+**Tier 2 — a list of steps.** `createRamp` drafts one: a hue through Tailwind's
+stops, or a ramp drawn through a brand color so that color is a step exactly,
+chroma a fixed share of what the gamut allows at each step. What comes out is
+steps, indistinguishable from placed ones. `inspectRamp` measures a ramp — drafted
+or placed. `minPass` finds the first step that clears a surface. `createScale`
+is the one continuous thing, for data rather than palettes. Built from Tier 1's
+public surface only; `tests/architecture.test.ts` reads the Tier 2 sources and
+fails if they import anything else.
 
 **Tier 3 — a whole system.** `resolveBinding` and `buildTokenSet` bind the
-steps an eye placed to semantic roles, in a light and a dark scheme that ship as
-one `light-dark()` value per token, with a receipt per pairing per scheme; the three
-exporters ship the set as CSS, DTCG design tokens, or a Tailwind theme. The
-opinion layer, every part rebuildable from Tiers 1–2. A pairing that does not
+steps an eye placed to semantic roles, in a light and a dark scheme, with a
+receipt per pairing per scheme. `shadcnBindings` is the one preset: shadcn/ui's
+variables bound to a neutral, a primary, and a destructive ramp, surfaces picked
+and inks solved, so it clears out of the box for any brand hue and every step is
+still the eye's to move. `auditTokenSet` is the editor's view of the same walk: a
+verdict per token — clears, fails with the check attached, or unresolved by
+name — with the refusal recorded instead of thrown. The exporters ship the set
+as plain CSS with `light-dark()`, a Tailwind theme, DTCG design tokens, or
+shadcn's `:root` / `.dark` / `@theme inline` blocks and a `registry:theme` item.
+The opinion layer, every part rebuildable from Tiers 1–2. A pairing that does not
 clear is refused, not filled in — there is no fallback color anywhere.
 
 The tiers are a guarantee, not a diagram: a higher tier has no privileged access

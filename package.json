@@ -14,8 +14,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "pnpm -r build",
-    "dev": "pnpm --filter examples dev",
-    "gate": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "dev": "pnpm --filter studio dev",
+    "gate": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "dev:examples": "pnpm --filter examples dev"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

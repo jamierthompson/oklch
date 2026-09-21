@@ -96,18 +96,30 @@ ink.toward.dark?.check.apca.margin; // how much room the dark ink has
 
 See [docs/concepts/architecture.md](docs/concepts/architecture.md).
 
+## The studio
+
+`apps/studio` is the tool the library exists for: a brand color in, shadcn's
+theme out, with every step still the eye's to move. It drafts a tinted neutral,
+the brand ramp through the color, and a red; binds all 31 shadcn variables;
+shows a verdict per token in both schemes, with real shadcn components skinned
+by the palette as it stands; and ships the set as shadcn CSS, a `registry:theme`
+item, or DTCG tokens once every pairing clears. Brands persist in the browser
+and travel as JSON files.
+
 ## Develop
 
 ```bash
 pnpm install
-pnpm dev     # one example page per function, at http://localhost:5173
-pnpm test    # contract tests
-pnpm gate    # format, lint, typecheck, test, build — what CI runs
+pnpm dev            # the studio, at http://localhost:5173
+pnpm dev:examples   # one example page per library function
+pnpm test           # contract tests, and the studio's model tests
+pnpm gate           # format, lint, typecheck, test, build — what CI runs
 ```
 
 ## Structure
 
 - `packages/oklch` — the library. Its only dependency is colorjs.io.
+- `apps/studio` — the brand palette studio: React, Vite, Tailwind v4, shadcn/ui.
 - `examples` — one Vite page per function, each showing when you'd reach for it.
 - `tests` — the architectural test that keeps Tier 2 on Tier 1's public surface.
 - `docs/concepts` — the architecture and the contract.

@@ -1,12 +1,27 @@
-import { auditOf } from "@jamiethompson/oklch-brand";
-import { useEffect, useMemo, useState } from "react";
+import {
+  auditOf,
+  newBrand,
+  parse,
+  type Brand,
+} from "@jamiethompson/oklch-brand";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BrandBar } from "@/components/BrandBar.tsx";
 import { ExportPanel } from "@/components/ExportPanel.tsx";
 import { Preview } from "@/components/Preview.tsx";
 import { RampsPanel } from "@/components/RampsPanel.tsx";
-import { TokensPanel } from "@/components/TokensPanel.tsx";
 import { StartBrand } from "@/components/StartBrand.tsx";
+import { TokensPanel } from "@/components/TokensPanel.tsx";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Empty,
   EmptyDescription,
@@ -16,6 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useBrands } from "@/hooks/useBrands.ts";
+import { SEEDS } from "@/lib/seeds.ts";
 
 function useSystemScheme() {
   useEffect(() => {
@@ -28,16 +44,53 @@ function useSystemScheme() {
   }, []);
 }
 
+/** A draft is named for its seed, or for what it is. */
+function draftName(color: string): string {
+  return (
+    SEEDS.find((s) => s.color.toLowerCase() === color.toLowerCase())?.name ??
+    "Draft"
+  );
+}
+
 export function App() {
   useSystemScheme();
-  const { brands, brand, update, select, add, duplicate, remove } = useBrands();
-  const [creating, setCreating] = useState(false);
+  const studio = useBrands();
+  const { brand, isDraft, dirty, tryBrand } = studio;
+  const [pending, setPending] = useState<Brand | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const audit = useMemo(
     () => (brand === null ? null : auditOf(brand)),
     [brand],
   );
 
-  const starting = brand === null || audit === null || creating;
+  /** Try a color: a draft, in memory. An edited draft asks before it is replaced. */
+  const pick = useCallback(
+    (color: string): string | null => {
+      let next: Brand;
+      try {
+        next = newBrand(draftName(color), color, brand?.gamut ?? "srgb");
+      } catch (e) {
+        return e instanceof Error ? e.message : String(e);
+      }
+      if (isDraft && dirty) setPending(next);
+      else tryBrand(next);
+      return null;
+    },
+    [brand?.gamut, isDraft, dirty, tryBrand],
+  );
+
+  const open = async (f: File | undefined) => {
+    if (f === undefined) return;
+    try {
+      studio.add({ ...parse(await f.text()), id: crypto.randomUUID() });
+      setFileError(null);
+    } catch (e) {
+      setFileError(
+        `could not read ${f.name}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  };
+
   const failing =
     audit === null
       ? 0
@@ -49,48 +102,25 @@ export function App() {
     <TooltipProvider>
       <div className="min-h-screen bg-background text-foreground">
         <BrandBar
-          brands={brands}
+          brands={studio.brands}
           brand={brand}
-          onSelect={select}
-          onUpdate={update}
-          onAdd={add}
-          onNew={() => setCreating(true)}
-          onDuplicate={duplicate}
-          onRemove={remove}
+          draft={studio.draft}
+          isDraft={isDraft}
+          onPick={pick}
+          onSelect={studio.select}
+          onUpdate={studio.update}
+          onSave={studio.saveDraft}
+          onOpen={(f) => void open(f)}
+          onDuplicate={studio.duplicate}
+          onRemove={studio.remove}
         />
+        {fileError !== null && (
+          <p className="px-4 pt-3 text-sm text-destructive">{fileError}</p>
+        )}
         <main className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-          {starting ? (
-            <StartBrand
-              onCreate={(b) => {
-                add(b);
-                setCreating(false);
-              }}
-              {...(brand === null
-                ? {}
-                : { onCancel: () => setCreating(false) })}
-            />
-          ) : (
-            <Tabs defaultValue="ramps" className="min-w-0">
-              <TabsList>
-                <TabsTrigger value="ramps">Ramps</TabsTrigger>
-                <TabsTrigger value="tokens">
-                  Tokens{failing > 0 ? ` · ${failing} failing` : ""}
-                </TabsTrigger>
-                <TabsTrigger value="export">Export</TabsTrigger>
-              </TabsList>
-              <TabsContent value="ramps" className="mt-3">
-                <RampsPanel brand={brand} onUpdate={update} />
-              </TabsContent>
-              <TabsContent value="tokens" className="mt-3">
-                <TokensPanel brand={brand} audit={audit} onUpdate={update} />
-              </TabsContent>
-              <TabsContent value="export" className="mt-3">
-                <ExportPanel brand={brand} audit={audit} />
-              </TabsContent>
-            </Tabs>
-          )}
-          <div className="grid content-start gap-4 xl:sticky xl:top-4 xl:self-start">
-            {brand === null || audit === null ? (
+          {brand === null || audit === null ? (
+            <>
+              <StartBrand onPick={pick} onOpen={(f) => void open(f)} />
               <Empty
                 className="min-h-[60vh] border border-dashed"
                 data-testid="preview-empty"
@@ -99,18 +129,67 @@ export function App() {
                   <EmptyTitle>Preview</EmptyTitle>
                   <EmptyDescription>
                     Real shadcn components, in both schemes, skinned by the
-                    palette as it stands. They appear once a brand exists.
+                    palette as it stands. They appear once a color is tried.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
-            ) : (
-              <>
+            </>
+          ) : (
+            <>
+              <Tabs defaultValue="ramps" className="min-w-0">
+                <TabsList>
+                  <TabsTrigger value="ramps">Ramps</TabsTrigger>
+                  <TabsTrigger value="tokens">
+                    Tokens{failing > 0 ? ` · ${failing} failing` : ""}
+                  </TabsTrigger>
+                  <TabsTrigger value="export">Export</TabsTrigger>
+                </TabsList>
+                <TabsContent value="ramps" className="mt-3">
+                  <RampsPanel brand={brand} onUpdate={studio.update} />
+                </TabsContent>
+                <TabsContent value="tokens" className="mt-3">
+                  <TokensPanel
+                    brand={brand}
+                    audit={audit}
+                    onUpdate={studio.update}
+                  />
+                </TabsContent>
+                <TabsContent value="export" className="mt-3">
+                  <ExportPanel brand={brand} audit={audit} />
+                </TabsContent>
+              </Tabs>
+              <div className="grid content-start gap-4 xl:sticky xl:top-4 xl:self-start">
                 <Preview brand={brand} audit={audit} scheme="light" />
                 <Preview brand={brand} audit={audit} scheme="dark" />
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </main>
+        <AlertDialog
+          open={pending !== null}
+          onOpenChange={(o) => !o && setPending(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Replace the edited draft?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The current draft has steps you moved and is not saved. Trying
+                another color replaces it. Save it as a brand first to keep it.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep editing</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (pending !== null) tryBrand(pending);
+                  setPending(null);
+                }}
+              >
+                Replace draft
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   );

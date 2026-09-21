@@ -1,9 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { App } from "./App.tsx";
 import { SEEDS } from "@/lib/seeds.ts";
+
+const storedNames = () =>
+  (
+    JSON.parse(localStorage.getItem("oklch-studio/brands")!) as {
+      brands: { name: string }[];
+    }
+  ).brands.map((b) => b.name);
 
 describe("App", () => {
   beforeEach(() => localStorage.clear());
@@ -13,39 +20,91 @@ describe("App", () => {
     expect(screen.getByText("No brand yet")).toBeInTheDocument();
     for (const s of SEEDS)
       expect(screen.getByRole("button", { name: s.name })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
     expect(screen.queryByTestId("preview-light")).not.toBeInTheDocument();
     expect(screen.getByTestId("preview-empty")).toBeInTheDocument();
-    expect(localStorage.getItem("oklch-studio/brands")).toContain(
-      '"brands":[]',
-    );
+    expect(storedNames()).toEqual([]);
   });
 
-  it("creates a brand from a seed and lands in the workspace with both previews skinned", async () => {
+  it("trying a seed drafts a whole palette in memory, and stores nothing", async () => {
     render(<App />);
-    await userEvent.type(screen.getByLabelText("Name"), "Acme");
     await userEvent.click(screen.getByRole("button", { name: "Forest" }));
-    expect(screen.getByLabelText("Or your own color")).toHaveValue("#059669");
-    await userEvent.click(screen.getByRole("button", { name: "Create" }));
-
-    expect(screen.getByLabelText("Brand name")).toHaveValue("Acme");
+    expect(screen.getByText("Draft · not saved")).toBeInTheDocument();
+    expect(screen.getByLabelText("Brand name")).toHaveValue("Forest");
     const light = screen.getByTestId("preview-light");
     const dark = screen.getByTestId("preview-dark");
     expect(light.style.getPropertyValue("--primary")).toMatch(/^oklch\(/);
     expect(dark).toHaveClass("dark");
-    expect(light.style.getPropertyValue("--background")).not.toBe(
-      dark.style.getPropertyValue("--background"),
+    expect(storedNames()).toEqual([]);
+    // The seeds stay in the header, and the one the draft came from is marked.
+    expect(screen.getByRole("button", { name: "Forest" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
-    const stored = JSON.parse(localStorage.getItem("oklch-studio/brands")!) as {
-      brands: { name: string }[];
-    };
-    expect(stored.brands.map((b) => b.name)).toEqual(["Acme"]);
+    expect(screen.getByRole("button", { name: "Ocean" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
-  it("explains a seed that is not a color, and stays on the welcome", async () => {
+  it("trying another seed replaces an untouched draft without asking", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Forest" }));
+    await userEvent.click(screen.getByRole("button", { name: "Coral" }));
+    expect(screen.getByLabelText("Brand name")).toHaveValue("Coral");
+    expect(
+      screen.queryByText("Replace the edited draft?"),
+    ).not.toBeInTheDocument();
+    expect(storedNames()).toEqual([]);
+  });
+
+  it("asks before replacing a draft that was edited", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Forest" }));
+    await userEvent.type(screen.getByLabelText("Brand name"), " Co");
+    await userEvent.click(screen.getByRole("button", { name: "Coral" }));
+    expect(
+      await screen.findByText("Replace the edited draft?"),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(screen.getByLabelText("Brand name")).toHaveValue("Forest Co");
+    await userEvent.click(screen.getByRole("button", { name: "Coral" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Replace draft" }),
+    );
+    expect(screen.getByLabelText("Brand name")).toHaveValue("Coral");
+  });
+
+  it("saving the draft is what stores a brand; discarding returns to empty", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Ocean" }));
+    await userEvent.clear(screen.getByLabelText("Brand name"));
+    await userEvent.type(screen.getByLabelText("Brand name"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Save brand" }));
+    expect(storedNames()).toEqual(["Acme"]);
+    expect(screen.queryByText("Draft · not saved")).not.toBeInTheDocument();
+    // The preview has a Delete button of its own; the header's is the one that acts.
+    const header = () => within(screen.getByRole("banner"));
+    expect(
+      header().getByRole("button", { name: "Delete" }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Plum" }));
+    expect(screen.getByText("Draft · not saved")).toBeInTheDocument();
+    expect(storedNames()).toEqual(["Acme"]);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Discard draft" }),
+    );
+    expect(screen.getByLabelText("Brand name")).toHaveValue("Acme");
+
+    await userEvent.click(header().getByRole("button", { name: "Delete" }));
+    expect(screen.getByText("No brand yet")).toBeInTheDocument();
+    expect(storedNames()).toEqual([]);
+  });
+
+  it("explains a color that is not one, and stays empty", async () => {
     render(<App />);
     await userEvent.type(screen.getByLabelText("Or your own color"), "blueish");
-    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await userEvent.click(screen.getByRole("button", { name: "Try" }));
     expect(screen.getByText(/"blueish" is not a color/)).toBeInTheDocument();
     expect(screen.getByText("No brand yet")).toBeInTheDocument();
   });

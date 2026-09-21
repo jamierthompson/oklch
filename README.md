@@ -99,13 +99,14 @@ See [docs/concepts/architecture.md](docs/concepts/architecture.md).
 ## The studio
 
 `apps/studio` is the tool the library exists for: a brand color in, shadcn's
-theme out, with every step still the eye's to move. It opens empty: pick one of
-a few seed colors or type your own, and it drafts a tinted neutral,
+theme out, with every step still the eye's to move. It opens empty. Trying a
+seed color, or one of your own, drafts a palette in memory: a tinted neutral,
 the brand ramp through the color, and a red; binds all 31 shadcn variables;
 shows a verdict per token in both schemes, with real shadcn components skinned
 by the palette as it stands; and ships the set as shadcn CSS, a `registry:theme`
-item, or DTCG tokens once every pairing clears. Brands persist in the browser
-and travel as JSON files.
+item, or DTCG tokens once every pairing clears. A draft lives only in the page
+until you save it as a brand; saved brands persist in the browser and travel as
+JSON files, and the seeds stay in the header to try another at any time.
 
 ## The brand file and the CLI
 

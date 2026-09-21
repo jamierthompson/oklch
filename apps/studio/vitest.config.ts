@@ -11,6 +11,8 @@ export default defineConfig({
   test: {
     name: "studio",
     environment: "jsdom",
+    // Testing Library's automatic cleanup hooks into a global afterEach.
+    globals: true,
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["src/test/setup.ts"],
   },

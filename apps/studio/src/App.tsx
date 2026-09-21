@@ -8,10 +8,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BrandBar } from "@/components/BrandBar.tsx";
 import { ExportPanel } from "@/components/ExportPanel.tsx";
+import { PalettePanel } from "@/components/PalettePanel.tsx";
 import { Preview } from "@/components/Preview.tsx";
-import { RampsPanel } from "@/components/RampsPanel.tsx";
 import { StartBrand } from "@/components/StartBrand.tsx";
-import { TokensPanel } from "@/components/TokensPanel.tsx";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -136,19 +135,16 @@ export function App() {
             </>
           ) : (
             <>
-              <Tabs defaultValue="ramps" className="min-w-0">
+              <Tabs defaultValue="palette" className="min-w-0">
                 <TabsList>
-                  <TabsTrigger value="ramps">Ramps</TabsTrigger>
-                  <TabsTrigger value="tokens">
-                    Tokens{failing > 0 ? ` · ${failing} failing` : ""}
+                  <TabsTrigger value="palette">
+                    Palette{failing > 0 ? ` · ${failing} failing` : ""}
                   </TabsTrigger>
                   <TabsTrigger value="export">Export</TabsTrigger>
                 </TabsList>
-                <TabsContent value="ramps" className="mt-3">
-                  <RampsPanel brand={brand} onUpdate={studio.update} />
-                </TabsContent>
-                <TabsContent value="tokens" className="mt-3">
-                  <TokensPanel
+                {/* Kept mounted so the selected step survives a look at Export. */}
+                <TabsContent value="palette" className="mt-3" keepMounted>
+                  <PalettePanel
                     brand={brand}
                     audit={audit}
                     onUpdate={studio.update}

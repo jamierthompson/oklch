@@ -41,5 +41,14 @@
   ],
   "dependencies": {
     "colorjs.io": "^0.7.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jamierthompson/oklch.git",
+    "directory": "packages/oklch"
+  },
+  "homepage": "https://github.com/jamierthompson/oklch#readme",
+  "bugs": {
+    "url": "https://github.com/jamierthompson/oklch/issues"
   }
 }

@@ -44,5 +44,14 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jamierthompson/oklch.git",
+    "directory": "packages/brand"
+  },
+  "homepage": "https://github.com/jamierthompson/oklch#readme",
+  "bugs": {
+    "url": "https://github.com/jamierthompson/oklch/issues"
   }
 }

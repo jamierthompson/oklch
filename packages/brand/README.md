@@ -16,6 +16,6 @@ pnpm oklch-brand build acme.oklch.json -o src   # acme.css, acme.registry.json, 
 written unless every token clears. There is no fallback color.
 
 The studio that edits these files lives in the
-[oklch repository](https://github.com/jamiethompson/oklch).
+[oklch repository](https://github.com/jamierthompson/oklch).
 
 MIT.

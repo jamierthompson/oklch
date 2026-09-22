@@ -110,7 +110,7 @@ export function ThemeSidebar({
     <Sidebar collapsible="icon">
       <SidebarHeader className="flex-row items-center justify-between gap-2">
         <span className="truncate px-1 text-sm font-semibold group-data-[collapsible=icon]:hidden">
-          oklch studio
+          Gridiron
         </span>
         <Button
           variant="ghost"

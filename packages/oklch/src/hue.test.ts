@@ -37,6 +37,7 @@ describe("harmony", () => {
       "analogous",
       "triadic",
       "split-complementary",
+      "tetradic",
     ]);
   });
 
@@ -59,8 +60,8 @@ describe("harmony", () => {
 
   it("refuses a kind outside the vocabulary", () => {
     // @ts-expect-error the contract under test
-    expect(() => harmony(SEED, "tetradic", "srgb")).toThrow(
-      /^harmony: kind is tetradic; pass one of complementary, analogous, triadic, split-complementary/,
+    expect(() => harmony(SEED, "monochrome", "srgb")).toThrow(
+      /^harmony: kind is monochrome; pass one of complementary, analogous, triadic, split-complementary, tetradic/,
     );
   });
 

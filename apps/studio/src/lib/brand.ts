@@ -1,13 +1,15 @@
 /**
- * A brand: the ramps the eye drew, which ramp plays which shadcn role, and
- * the steps the eye moved off the preset. Everything derived — bindings,
- * audit, exports — is a pure function of this document.
+ * A brand: two seeds and a harmony, the ramps drafted from them and then
+ * moved by eye, which ramp plays which shadcn role, and the steps moved
+ * off the preset. Everything derived — bindings, audit, exports — is a
+ * pure function of this document.
  */
 
 import {
   auditTokenSet,
   createRamp,
   formatOklch,
+  HARMONY_KINDS,
   parseColor,
   SHADCN_CHART_STEPS,
   SHADCN_TOKENS,
@@ -16,6 +18,7 @@ import {
   type AuditOutcome,
   type Binding,
   type Gamut,
+  type HarmonyKind,
   type OkLCH,
   type Ramp,
   type RampEnd,
@@ -25,7 +28,7 @@ import {
 } from "@jamiethompson/oklch";
 
 export type Scheme = "light" | "dark";
-export type Stops = "chromatic" | "neutral";
+export type { HarmonyKind };
 
 /**
  * The roles a ramp can play, in the order they are offered. A role is the
@@ -47,49 +50,33 @@ export const ROLES = [
   "chart-5",
 ] as const;
 export type Role = (typeof ROLES)[number];
-type RequiredRole = "neutral" | "primary" | "destructive";
 
-/** Which ramp plays which role. A role left out plays on its default: `primary` for a chart series, `neutral` otherwise. */
-export type Assignment = { readonly [R in RequiredRole]: string } & {
-  readonly [R in Exclude<Role, RequiredRole>]?: string;
-};
+/** The eye's choice of ramp for a role. A role left out plays on its default, which depends on the ramps the brand has. */
+export type Assignment = { readonly [R in Role]?: string };
 
-/** How a ramp was drafted; regenerating replays it over the eye's edits. */
-export type RampSeed =
-  | {
-      readonly kind: "hue";
-      readonly hue: number;
-      readonly saturation: number;
-      readonly stops: Stops;
-      readonly hueShift: number;
-    }
-  | {
-      readonly kind: "through";
-      /** A CSS color, as typed. */
-      readonly color: string;
-      readonly stops: Stops;
-      readonly hueShift: number;
-    };
-
+/** One ramp as it stands: drafted from the seeds, then moved by eye. */
 export interface BrandRamp {
   readonly name: string;
-  readonly seed: RampSeed;
-  /** The steps as they stand: drafted from `seed`, then moved by eye. */
   readonly steps: readonly OkLCH[];
+  /** The step placed on the seed, for a ramp drawn through one. */
+  readonly seed: number | null;
 }
 
 /** The eye's replacement for one token's preset step, on the ramp its role plays. Surface and target stay the preset's. */
 export type Override =
   { readonly step: number } | { readonly solve: true; readonly from: RampEnd };
 
-export const BRAND_VERSION = 2;
-
 export interface Brand {
-  readonly version: typeof BRAND_VERSION;
   readonly id: string;
   readonly name: string;
   readonly gamut: Gamut;
   readonly radius: string;
+  /** The brand color. Its hue tints the neutral and seeds the harmonies. */
+  readonly primary: OkLCH;
+  /** A second brand color, or none. */
+  readonly secondary: OkLCH | null;
+  /** Which hues of the primary's are drawn as ramps of their own. */
+  readonly harmony: HarmonyKind;
   readonly ramps: readonly BrandRamp[];
   readonly assignment: Assignment;
   readonly overrides: {
@@ -101,24 +88,90 @@ export interface Brand {
 /** Tailwind's slate sits near this share of the chroma its gamut allows. */
 export const NEUTRAL_TINT = 0.15;
 export const DESTRUCTIVE_HUE = 25;
+/** Below this chroma a color has no hue worth building on. */
+export const ACHROMATIC = 0.03;
 
-export function draftSteps(seed: RampSeed, gamut: Gamut): readonly OkLCH[] {
-  const lightness = TAILWIND_STOPS[seed.stops];
-  if (seed.kind === "hue") {
-    return createRamp({
-      hue: seed.hue,
-      saturation: seed.saturation,
-      hueShift: seed.hueShift,
-      lightness,
+export const HARMONY_LABELS: Record<
+  HarmonyKind,
+  { readonly name: string; readonly short: string }
+> = {
+  analogous: { name: "Analogous", short: "±30°" },
+  complementary: { name: "Complementary", short: "180°" },
+  "split-complementary": { name: "Split-complementary", short: "150/210°" },
+  triadic: { name: "Triadic", short: "±120°" },
+  tetradic: { name: "Tetradic", short: "90°×3" },
+};
+
+export function isChromatic(c: OkLCH): boolean {
+  return c.C >= ACHROMATIC;
+}
+
+/** The hue the neutral tint and the harmonies are built on: the primary's, else the secondary's, else none. */
+export function hueSourceOf(
+  primary: OkLCH,
+  secondary: OkLCH | null,
+): OkLCH | null {
+  if (isChromatic(primary)) return primary;
+  if (secondary !== null && isChromatic(secondary)) return secondary;
+  return null;
+}
+
+/** The name of the nth harmony ramp, counting from 1. */
+export const harmonyName = (n: number): string => `harmony-${n}`;
+
+/**
+ * Every ramp the seeds draft, in display order: the tinted neutral, the
+ * primary through its seed, the secondary through its seed when there is
+ * one, a red, and one ramp per harmony offset. Throws when a seed sits
+ * beyond the gamut's safe chroma at its lightness.
+ */
+export function draftRamps(
+  brand: Pick<Brand, "primary" | "secondary" | "harmony" | "gamut">,
+): BrandRamp[] {
+  const { gamut } = brand;
+  const source = hueSourceOf(brand.primary, brand.secondary);
+  const through = (name: string, color: OkLCH): BrandRamp => {
+    const r = createRamp({
+      through: color,
+      lightness: TAILWIND_STOPS.chromatic,
       gamut,
-    }).steps;
-  }
-  const through = parseColor(seed.color);
-  if (through === null) {
-    throw new Error(`"${seed.color}" is not a color this package reads`);
-  }
-  return createRamp({ through, hueShift: seed.hueShift, lightness, gamut })
-    .steps;
+    });
+    return { name, steps: r.steps, seed: r.through?.index ?? null };
+  };
+  const at = (name: string, hue: number, saturation: number): BrandRamp => ({
+    name,
+    steps: createRamp({
+      hue,
+      saturation,
+      lightness: TAILWIND_STOPS.chromatic,
+      gamut,
+    }).steps,
+    seed: null,
+  });
+  const primary = through("primary", brand.primary);
+  const secondary =
+    brand.secondary === null ? [] : [through("secondary", brand.secondary)];
+  const neutral: BrandRamp = {
+    name: "neutral",
+    steps: createRamp({
+      hue: source?.H ?? 0,
+      saturation: source === null ? 0 : NEUTRAL_TINT,
+      lightness: TAILWIND_STOPS.neutral,
+      gamut,
+    }).steps,
+    seed: null,
+  };
+  const red = at("red", DESTRUCTIVE_HUE, 0.85);
+  // The harmonies keep the source's share of the gamut, so they read as one family.
+  const share =
+    source === null ? 0 : createRamp({ through: source, gamut }).saturation;
+  const harmonies =
+    source === null
+      ? []
+      : HARMONY_KINDS[brand.harmony].map((offset, i) =>
+          at(harmonyName(i + 1), source.H + offset, share),
+        );
+  return [neutral, primary, ...secondary, red, ...harmonies];
 }
 
 export function newId(): string {
@@ -126,49 +179,27 @@ export function newId(): string {
 }
 
 /**
- * A brand from one color: a neutral tinted to its hue, the brand ramp drawn
- * through it, and a red for destructive. Throws when the seed is not a
- * color, or sits beyond the gamut's safe chroma at its lightness.
+ * A brand from one color. Throws when the seed is not a color, or sits
+ * beyond the gamut's safe chroma at its lightness.
  */
 export function newBrand(name: string, seed: string, gamut: Gamut): Brand {
-  const color = parseColor(seed);
-  if (color === null) {
+  const primary = parseColor(seed);
+  if (primary === null) {
     throw new Error(`"${seed}" is not a color this package reads`);
   }
-  const seeds: { name: string; seed: RampSeed }[] = [
-    {
-      name: "neutral",
-      seed: {
-        kind: "hue",
-        hue: color.H,
-        saturation: NEUTRAL_TINT,
-        stops: "neutral",
-        hueShift: 0,
-      },
-    },
-    {
-      name: "brand",
-      seed: { kind: "through", color: seed, stops: "chromatic", hueShift: 0 },
-    },
-    {
-      name: "red",
-      seed: {
-        kind: "hue",
-        hue: DESTRUCTIVE_HUE,
-        saturation: 0.85,
-        stops: "chromatic",
-        hueShift: 0,
-      },
-    },
-  ];
+  const seeds = {
+    primary,
+    secondary: null,
+    harmony: "analogous",
+    gamut,
+  } as const;
   return {
-    version: BRAND_VERSION,
     id: newId(),
     name,
-    gamut,
     radius: "0.625rem",
-    ramps: seeds.map((r) => ({ ...r, steps: draftSteps(r.seed, gamut) })),
-    assignment: { neutral: "neutral", primary: "brand", destructive: "red" },
+    ...seeds,
+    ramps: draftRamps(seeds),
+    assignment: {},
     overrides: { light: {}, dark: {} },
   };
 }
@@ -177,13 +208,46 @@ export function rampsOf(brand: Brand): Ramp[] {
   return brand.ramps.map((r) => ({ name: r.name, steps: r.steps }));
 }
 
-/** Which ramp plays this role: the one assigned, else the role's default. */
+export function hasRamp(brand: Brand, name: string): boolean {
+  return brand.ramps.some((r) => r.name === name);
+}
+
+/** The ramp a role plays when the eye has not chosen: what the seeds give it. */
+export function defaultRampOf(brand: Brand, role: Role): string {
+  const has = (name: string) => hasRamp(brand, name);
+  switch (role) {
+    case "neutral":
+    case "sidebar":
+      return "neutral";
+    case "primary":
+    case "ring":
+      return "primary";
+    case "destructive":
+      return "red";
+    case "secondary":
+      return has("secondary") ? "secondary" : "neutral";
+    case "accent":
+      return has(harmonyName(1)) ? harmonyName(1) : "neutral";
+    default: {
+      // The chart series walk the chromatic ramps in order, then repeat the primary.
+      const series = [
+        "primary",
+        "secondary",
+        harmonyName(1),
+        harmonyName(2),
+        harmonyName(3),
+      ].filter(has);
+      return series[Number(role.slice("chart-".length)) - 1] ?? "primary";
+    }
+  }
+}
+
+/** Which ramp plays this role: the one the eye chose, if the brand still has it, else the default. */
 export function rampOf(brand: Brand, role: Role): string {
   const assigned = brand.assignment[role];
-  if (assigned !== undefined) return assigned;
-  return role.startsWith("chart-")
-    ? brand.assignment.primary
-    : brand.assignment.neutral;
+  return assigned !== undefined && hasRamp(brand, assigned)
+    ? assigned
+    : defaultRampOf(brand, role);
 }
 
 /** Every role this ramp plays, in `ROLES` order. */
@@ -193,7 +257,7 @@ export function rolesOf(brand: Brand, ramp: string): Role[] {
 
 /** Give a ramp a role. Throws by name on a ramp the brand does not have. */
 export function withRole(brand: Brand, role: Role, ramp: string): Brand {
-  if (!brand.ramps.some((r) => r.name === ramp)) {
+  if (!hasRamp(brand, ramp)) {
     throw new Error(`no ramp named "${ramp}" to play ${role}`);
   }
   return { ...brand, assignment: { ...brand.assignment, [role]: ramp } };
@@ -330,50 +394,49 @@ export function withStep(
   };
 }
 
-export function withSeed(
-  brand: Brand,
-  rampName: string,
-  seed: RampSeed,
-): Brand {
+/**
+ * Redraft the ramps from the seeds, keeping the steps of every ramp in
+ * `keep` that the seeds still draw, so what the eye moved on a ramp the
+ * change did not touch stays moved.
+ */
+function redrawn(brand: Brand, keep: readonly string[]): Brand {
+  const kept = new Map(
+    brand.ramps.filter((r) => keep.includes(r.name)).map((r) => [r.name, r]),
+  );
   return {
     ...brand,
-    ramps: brand.ramps.map((r) =>
-      r.name === rampName
-        ? { ...r, seed, steps: draftSteps(seed, brand.gamut) }
-        : r,
-    ),
+    ramps: draftRamps(brand).map((r) => kept.get(r.name) ?? r),
   };
 }
 
-const RAMP_NAME = /^[a-z][a-z0-9-]*$/;
-
-export function withRamp(brand: Brand, name: string, seed: RampSeed): Brand {
-  if (!RAMP_NAME.test(name)) {
-    throw new Error(
-      `ramp name "${name}" must be lowercase letters, digits and hyphens, starting with a letter`,
-    );
-  }
-  if (brand.ramps.some((r) => r.name === name)) {
-    throw new Error(`a ramp named "${name}" already exists`);
-  }
-  return {
-    ...brand,
-    ramps: [
-      ...brand.ramps,
-      { name, seed, steps: draftSteps(seed, brand.gamut) },
-    ],
-  };
+/** A new primary seed: the primary, the neutral tint, and the harmonies redraw; the secondary and the red keep the eye's steps. */
+export function withPrimary(brand: Brand, primary: OkLCH): Brand {
+  return redrawn({ ...brand, primary }, ["secondary", "red"]);
 }
 
-/** Removes a ramp that plays no role. Throws by name otherwise. */
-export function withoutRamp(brand: Brand, name: string): Brand {
-  const roles = rolesOf(brand, name);
-  if (roles.length > 0) {
-    throw new Error(
-      `ramp "${name}" plays ${roles.join(", ")}; give ${roles.length === 1 ? "that role" : "those roles"} another ramp first`,
-    );
-  }
-  return { ...brand, ramps: brand.ramps.filter((r) => r.name !== name) };
+/**
+ * A new secondary seed, or none. The secondary redraws; everything built
+ * on the hue source redraws too when that source is or was the secondary.
+ */
+export function withSecondary(brand: Brand, secondary: OkLCH | null): Brand {
+  const next = { ...brand, secondary };
+  const sourceIsPrimary =
+    hueSourceOf(brand.primary, brand.secondary) === brand.primary &&
+    hueSourceOf(next.primary, next.secondary) === next.primary;
+  return redrawn(
+    next,
+    sourceIsPrimary
+      ? brand.ramps.map((r) => r.name).filter((n) => n !== "secondary")
+      : ["primary", "red"],
+  );
+}
+
+/** Another harmony: only the harmony ramps redraw. */
+export function withHarmony(brand: Brand, harmony: HarmonyKind): Brand {
+  return redrawn(
+    { ...brand, harmony },
+    brand.ramps.map((r) => r.name).filter((n) => !n.startsWith("harmony-")),
+  );
 }
 
 export function withGamut(brand: Brand, gamut: Gamut): Brand {
@@ -384,51 +447,33 @@ export function serialize(brand: Brand): string {
   return JSON.stringify(brand, null, 2);
 }
 
-/**
- * A version 1 document, as version 2. Version 1 let an override name a
- * ramp of its own; now a token's ramp is its role's, so the ramp is
- * dropped and the step or solve kept. A step that was picked on another
- * ramp lands on the role's ramp at the same index, where the audit will
- * say whether it clears.
- */
-function migrate(b: Record<string, unknown>): Record<string, unknown> {
-  if (b["version"] !== 1) return b;
-  const overrides = (b["overrides"] ?? {}) as Record<
-    string,
-    Record<string, Record<string, unknown>>
-  >;
-  const strip = (scheme: string) =>
-    Object.fromEntries(
-      Object.entries(overrides[scheme] ?? {}).map(([token, o]) => {
-        const rest = { ...o };
-        delete rest["ramp"];
-        return [token, rest];
-      }),
-    );
-  const assignment = {
-    ...((b["assignment"] ?? {}) as Record<string, unknown>),
-  };
-  delete assignment["charts"];
-  return {
-    ...b,
-    version: BRAND_VERSION,
-    assignment,
-    overrides: { light: strip("light"), dark: strip("dark") },
-  };
+function isColor(v: unknown): v is OkLCH {
+  if (typeof v !== "object" || v === null) return false;
+  const c = v as Record<string, unknown>;
+  return (["L", "C", "H"] as const).every(
+    (ch) => typeof c[ch] === "number" && Number.isFinite(c[ch]),
+  );
 }
 
-/** Reads a brand back, naming what is wrong with it. A version 1 file is read as version 2. */
+/** Reads a brand back, naming what is wrong with it. */
 export function parse(text: string): Brand {
   const raw: unknown = JSON.parse(text);
   if (typeof raw !== "object" || raw === null) throw new Error("not an object");
-  const b = migrate(raw as Record<string, unknown>);
-  if (b["version"] !== BRAND_VERSION)
-    throw new Error(`version ${String(b["version"])} is not ${BRAND_VERSION}`);
+  const b = raw as Record<string, unknown>;
   for (const key of ["id", "name", "radius"] as const) {
     if (typeof b[key] !== "string") throw new Error(`${key} is not a string`);
   }
   if (b["gamut"] !== "srgb" && b["gamut"] !== "p3") {
     throw new Error(`gamut ${String(b["gamut"])} is not "srgb" or "p3"`);
+  }
+  if (!isColor(b["primary"])) throw new Error("primary is not a color");
+  if (b["secondary"] !== null && !isColor(b["secondary"])) {
+    throw new Error("secondary is not a color or null");
+  }
+  if (!Object.hasOwn(HARMONY_KINDS, String(b["harmony"]))) {
+    throw new Error(
+      `harmony ${String(b["harmony"])} is not one of ${Object.keys(HARMONY_KINDS).join(", ")}`,
+    );
   }
   if (!Array.isArray(b["ramps"]) || b["ramps"].length === 0) {
     throw new Error("ramps is not a non-empty list");
@@ -440,25 +485,22 @@ export function parse(text: string): Brand {
       throw new Error(`ramp "${ramp["name"]}" has no steps`);
     }
     for (const s of ramp["steps"] as unknown[]) {
-      const step = s as Record<string, unknown>;
-      for (const ch of ["L", "C", "H"] as const) {
-        if (typeof step[ch] !== "number" || !Number.isFinite(step[ch])) {
-          throw new Error(
-            `ramp "${ramp["name"]}" has a step whose ${ch} is not a number`,
-          );
-        }
+      if (!isColor(s)) {
+        throw new Error(
+          `ramp "${ramp["name"]}" has a step that is not a color`,
+        );
       }
+    }
+    if (ramp["seed"] !== null && !Number.isInteger(ramp["seed"])) {
+      throw new Error(
+        `ramp "${ramp["name"]}" has a seed step that is not an index`,
+      );
     }
   }
   const brand = b as unknown as Brand;
   const names = new Set(brand.ramps.map((r) => r.name));
   if (typeof brand.assignment !== "object" || brand.assignment === null) {
     throw new Error("assignment is not an object");
-  }
-  for (const role of ["neutral", "primary", "destructive"] as const) {
-    if (typeof brand.assignment[role] !== "string") {
-      throw new Error(`${role} names no ramp`);
-    }
   }
   for (const [role, v] of Object.entries(brand.assignment)) {
     if (!(ROLES as readonly string[]).includes(role)) {

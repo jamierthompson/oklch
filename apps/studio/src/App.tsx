@@ -1,10 +1,10 @@
-import { auditOf, newBrand, parse, type Brand } from "@/lib/brand.ts";
+import { auditOf, newBrand, type Brand } from "@/lib/brand.ts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BrandBar } from "@/components/BrandBar.tsx";
 import { ExportPanel } from "@/components/ExportPanel.tsx";
 import { PalettePanel } from "@/components/PalettePanel.tsx";
-import { Preview } from "@/components/Preview.tsx";
+import { SeedRail } from "@/components/SeedRail.tsx";
 import { StartBrand } from "@/components/StartBrand.tsx";
 import {
   AlertDialog,
@@ -16,12 +16,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useBrands } from "@/hooks/useBrands.ts";
@@ -51,7 +45,6 @@ export function App() {
   const studio = useBrands();
   const { brand, isDraft, dirty, tryBrand } = studio;
   const [pending, setPending] = useState<Brand | null>(null);
-  const [fileError, setFileError] = useState<string | null>(null);
   const audit = useMemo(
     () => (brand === null ? null : auditOf(brand)),
     [brand],
@@ -73,18 +66,6 @@ export function App() {
     [brand?.gamut, isDraft, dirty, tryBrand],
   );
 
-  const open = async (f: File | undefined) => {
-    if (f === undefined) return;
-    try {
-      studio.add({ ...parse(await f.text()), id: crypto.randomUUID() });
-      setFileError(null);
-    } catch (e) {
-      setFileError(
-        `could not read ${f.name}: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    }
-  };
-
   const failing =
     audit === null
       ? 0
@@ -104,33 +85,17 @@ export function App() {
           onSelect={studio.select}
           onUpdate={studio.update}
           onSave={studio.saveDraft}
-          onOpen={(f) => void open(f)}
           onDuplicate={studio.duplicate}
           onRemove={studio.remove}
         />
-        {fileError !== null && (
-          <p className="px-4 pt-3 text-sm text-destructive">{fileError}</p>
-        )}
-        <main className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-          {brand === null || audit === null ? (
-            <>
-              <StartBrand onPick={pick} onOpen={(f) => void open(f)} />
-              <Empty
-                className="min-h-[60vh] border border-dashed"
-                data-testid="preview-empty"
-              >
-                <EmptyHeader>
-                  <EmptyTitle>Preview</EmptyTitle>
-                  <EmptyDescription>
-                    Real shadcn components, in both schemes, skinned by the
-                    palette as it stands. They appear once a color is tried.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            </>
-          ) : (
-            <>
-              <Tabs defaultValue="palette" className="min-w-0">
+        {brand === null || audit === null ? (
+          <main className="p-4">
+            <StartBrand onPick={pick} />
+          </main>
+        ) : (
+          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <main className="min-w-0">
+              <Tabs defaultValue="palette">
                 <TabsList>
                   <TabsTrigger value="palette">
                     Palette{failing > 0 ? ` · ${failing} failing` : ""}
@@ -149,13 +114,14 @@ export function App() {
                   <ExportPanel brand={brand} audit={audit} />
                 </TabsContent>
               </Tabs>
-              <div className="grid content-start gap-4 xl:sticky xl:top-4 xl:self-start">
-                <Preview brand={brand} audit={audit} scheme="light" />
-                <Preview brand={brand} audit={audit} scheme="dark" />
-              </div>
-            </>
-          )}
-        </main>
+            </main>
+            <SeedRail
+              brand={brand}
+              onUpdate={studio.update}
+              className="rounded-lg border px-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
+            />
+          </div>
+        )}
         <AlertDialog
           open={pending !== null}
           onOpenChange={(o) => !o && setPending(null)}

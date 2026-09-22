@@ -81,12 +81,6 @@ export function useBrands() {
     setStored((s) => ({ ...s, current: id }));
   }, []);
 
-  /** A brand from a file: saved as it arrives. */
-  const add = useCallback((b: Brand) => {
-    setOnDraft(false);
-    setStored((s) => ({ brands: [...s.brands, b], current: b.id }));
-  }, []);
-
   const duplicate = useCallback(() => {
     if (brand === null) return;
     const copy = { ...brand, id: newId(), name: `${brand.name} copy` };
@@ -116,7 +110,6 @@ export function useBrands() {
     discardDraft,
     update,
     select,
-    add,
     duplicate,
     remove,
   };

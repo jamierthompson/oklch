@@ -11,36 +11,45 @@ import {
   rolesOf,
   serialize,
   snapTo,
+  withHarmony,
   withOverride,
-  withoutRamp,
-  withRamp,
+  withPrimary,
   withRole,
-  withSeed,
+  withSecondary,
   withStep,
 } from "./brand.ts";
 
 const acme = () => newBrand("Acme", "#2563eb", "srgb");
+const names = (b: ReturnType<typeof acme>) => b.ramps.map((r) => r.name);
+const amber = { L: 0.7, C: 0.15, H: 70 };
 
 describe("newBrand", () => {
-  it("drafts a tinted neutral, the brand ramp through the seed, and a red", () => {
+  it("drafts a tinted neutral, the primary through the seed, a red, and the analogous harmonies", () => {
     const b = acme();
-    expect(b.ramps.map((r) => r.name)).toEqual(["neutral", "brand", "red"]);
+    expect(names(b)).toEqual([
+      "neutral",
+      "primary",
+      "red",
+      "harmony-1",
+      "harmony-2",
+    ]);
     for (const r of b.ramps) expect(r.steps).toHaveLength(11);
     expect(b.ramps[0]!.steps.map((s) => s.L)).toEqual([
       ...TAILWIND_STOPS.neutral,
     ]);
     expect(b.ramps[0]!.steps[5]!.C).toBeGreaterThan(0.005);
-    expect(b.ramps[1]!.seed).toEqual({
-      kind: "through",
-      color: "#2563eb",
-      stops: "chromatic",
-      hueShift: 0,
-    });
-    expect(b.assignment).toEqual({
-      neutral: "neutral",
-      primary: "brand",
-      destructive: "red",
-    });
+    expect(b.secondary).toBeNull();
+    expect(b.harmony).toBe("analogous");
+    expect(b.assignment).toEqual({});
+    // The primary is a step of its ramp, exactly.
+    const primary = b.ramps[1]!;
+    expect(primary.seed).not.toBeNull();
+    expect(primary.steps[primary.seed!]).toEqual(b.primary);
+    // The harmonies sit at the primary's hue plus the offsets.
+    const hue = (name: string) =>
+      b.ramps.find((r) => r.name === name)!.steps[5]!.H;
+    expect(hue("harmony-1")).toBeCloseTo((b.primary.H - 30 + 360) % 360, 0);
+    expect(hue("harmony-2")).toBeCloseTo((b.primary.H + 30) % 360, 0);
   });
 
   it("passes the audit out of the box", () => {
@@ -55,30 +64,114 @@ describe("newBrand", () => {
 });
 
 describe("roles", () => {
-  it("default a chart series to the primary ramp and the rest to the neutral", () => {
+  it("default from the ramps the seeds give: accent and chart-2 on the first harmony, the rest on primary or neutral", () => {
     const b = acme();
-    expect(rampOf(b, "chart-3")).toBe("brand");
+    expect(rampOf(b, "secondary")).toBe("neutral");
+    expect(rampOf(b, "accent")).toBe("harmony-1");
+    expect(rampOf(b, "ring")).toBe("primary");
     expect(rampOf(b, "sidebar")).toBe("neutral");
-    expect(rampOf(b, "ring")).toBe("neutral");
+    expect(
+      ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"].map((r) =>
+        rampOf(b, r as "chart-1"),
+      ),
+    ).toEqual(["primary", "harmony-1", "harmony-2", "primary", "primary"]);
     expect(rolesOf(b, "red")).toEqual(["destructive"]);
-    expect(rolesOf(b, "brand")).toEqual([
-      "primary",
-      "chart-1",
-      "chart-2",
-      "chart-3",
-      "chart-4",
-      "chart-5",
-    ]);
+  });
+
+  it("move to the secondary when a secondary seed arrives, unless the eye chose", () => {
+    const b = withSecondary(acme(), amber);
+    expect(names(b)).toContain("secondary");
+    expect(rampOf(b, "secondary")).toBe("secondary");
+    expect(rampOf(b, "chart-2")).toBe("secondary");
+    expect(rampOf(b, "chart-3")).toBe("harmony-1");
+    const chosen = withRole(b, "chart-3", "harmony-2");
+    expect(rampOf(chosen, "chart-3")).toBe("harmony-2");
+    // A choice naming a ramp the brand no longer has falls back to the default.
+    expect(rampOf(withHarmony(chosen, "complementary"), "chart-3")).toBe(
+      "harmony-1",
+    );
+    expect(() => withRole(b, "ring", "teal")).toThrow(/no ramp named "teal"/);
   });
 
   it("put every token of a role on the role's ramp", () => {
-    const b = withRole(withRole(acme(), "chart-2", "red"), "sidebar", "brand");
+    const b = withRole(acme(), "sidebar", "primary");
     const light = bindingsOf(b).light;
-    expect(light.find((x) => x.token === "chart-2")!.ramp).toBe("red");
-    expect(light.find((x) => x.token === "chart-1")!.ramp).toBe("brand");
-    expect(light.find((x) => x.token === "sidebar")!.ramp).toBe("brand");
-    expect(light.find((x) => x.token === "sidebar-border")!.ramp).toBe("brand");
-    expect(() => withRole(b, "ring", "teal")).toThrow(/no ramp named "teal"/);
+    for (const token of ["sidebar", "sidebar-border"]) {
+      expect(light.find((x) => x.token === token)!.ramp).toBe("primary");
+    }
+    expect(light.find((x) => x.token === "chart-2")!.ramp).toBe("harmony-1");
+  });
+});
+
+describe("seeds", () => {
+  it("a new primary redraws the primary, the neutral tint and the harmonies, and keeps the eye's steps elsewhere", () => {
+    const moved = withStep(withSecondary(acme(), amber), "secondary", 5, {
+      L: 0.5,
+      C: 0.1,
+      H: 100,
+    });
+    const b = withPrimary(moved, { L: 0.6, C: 0.2, H: 30 });
+    expect(b.primary).toEqual({ L: 0.6, C: 0.2, H: 30 });
+    expect(b.ramps.find((r) => r.name === "secondary")!.steps[5]).toEqual({
+      L: 0.5,
+      C: 0.1,
+      H: 100,
+    });
+    expect(
+      b.ramps.find((r) => r.name === "harmony-2")!.steps[5]!.H,
+    ).toBeCloseTo(60, 0);
+    expect(b.ramps.find((r) => r.name === "neutral")!.steps[5]!.H).toBeCloseTo(
+      30,
+      0,
+    );
+  });
+
+  it("a harmony change redraws only the harmony ramps", () => {
+    const moved = withStep(acme(), "primary", 5, { L: 0.5, C: 0.1, H: 200 });
+    const b = withHarmony(moved, "tetradic");
+    expect(names(b)).toEqual([
+      "neutral",
+      "primary",
+      "red",
+      "harmony-1",
+      "harmony-2",
+      "harmony-3",
+    ]);
+    expect(b.ramps.find((r) => r.name === "primary")!.steps[5]).toEqual({
+      L: 0.5,
+      C: 0.1,
+      H: 200,
+    });
+    expect(names(withHarmony(b, "complementary"))).toEqual([
+      "neutral",
+      "primary",
+      "red",
+      "harmony-1",
+    ]);
+  });
+
+  it("an achromatic primary builds the tint and the harmonies on the secondary's hue, or on nothing", () => {
+    const gray = newBrand("Gray", "#475569", "srgb");
+    const flat = withPrimary(gray, { L: 0.4, C: 0.005, H: 0 });
+    expect(names(flat)).toEqual(["neutral", "primary", "red"]);
+    expect(flat.ramps[0]!.steps[5]!.C).toBe(0);
+    const tinted = withSecondary(flat, amber);
+    expect(names(tinted)).toEqual([
+      "neutral",
+      "primary",
+      "secondary",
+      "red",
+      "harmony-1",
+      "harmony-2",
+    ]);
+    expect(tinted.ramps[0]!.steps[5]!.H).toBeCloseTo(70, 0);
+    expect(auditOf(tinted).passes).toBe(true);
+  });
+
+  it("refuses a seed beyond the safe chroma at its lightness", () => {
+    expect(() => withPrimary(acme(), { L: 0.9, C: 0.3, H: 250 })).toThrow(
+      /safe chroma/,
+    );
   });
 });
 
@@ -88,7 +181,7 @@ describe("overrides", () => {
     const primary = bindingsOf(b).light.find((x) => x.token === "primary")!;
     expect(primary).toEqual({
       token: "primary",
-      ramp: "brand",
+      ramp: "primary",
       step: 3,
       on: "background",
       target: { wcag: 3, apca: 30 },
@@ -114,51 +207,11 @@ describe("overrides", () => {
   it("snap gives the failing token the step its solve would land on", () => {
     const failing = withOverride(acme(), "light", "primary", { step: 1 });
     const snapped = snapTo(failing, "light", "primary");
-    expect(snapped).not.toBeNull();
     expect(snapped).toEqual({ step: expect.any(Number) });
     const b = withOverride(failing, "light", "primary", snapped);
     expect(
       auditOf(b).light.find((a) => a.token === "primary")!.outcome.kind,
     ).toBe("clears");
-  });
-});
-
-describe("ramps", () => {
-  it("moves one step by eye and leaves the seed for a regenerate", () => {
-    const b = withStep(acme(), "brand", 5, { L: 0.5, C: 0.1, H: 200 });
-    expect(b.ramps[1]!.steps[5]).toEqual({ L: 0.5, C: 0.1, H: 200 });
-    expect(b.ramps[1]!.steps[4]).toEqual(acme().ramps[1]!.steps[4]);
-    const again = withSeed(b, "brand", b.ramps[1]!.seed);
-    expect(again.ramps[1]!.steps).toEqual(acme().ramps[1]!.steps);
-  });
-
-  it("adds a ramp and refuses a duplicate or bad name", () => {
-    const seed = {
-      kind: "hue",
-      hue: 150,
-      saturation: 0.7,
-      stops: "chromatic",
-      hueShift: 0,
-    } as const;
-    const b = withRamp(acme(), "green", seed);
-    expect(b.ramps.at(-1)!.name).toBe("green");
-    expect(() => withRamp(b, "green", seed)).toThrow(/already exists/);
-    expect(() => withRamp(b, "Green", seed)).toThrow(/lowercase/);
-  });
-
-  it("removes a ramp only when it plays no role", () => {
-    const seed = {
-      kind: "hue",
-      hue: 150,
-      saturation: 0.7,
-      stops: "chromatic",
-      hueShift: 0,
-    } as const;
-    const b = withRamp(acme(), "green", seed);
-    expect(withoutRamp(b, "green").ramps).toHaveLength(3);
-    expect(() => withoutRamp(b, "brand")).toThrow(/plays primary, chart-1/);
-    const charted = withRole(b, "chart-1", "green");
-    expect(() => withoutRamp(charted, "green")).toThrow(/plays chart-1;/);
   });
 });
 
@@ -173,57 +226,27 @@ describe("cssVarsOf", () => {
 
 describe("serialize and parse", () => {
   it("round-trips", () => {
-    const b = acme();
+    const b = withSecondary(acme(), amber);
     expect(parse(serialize(b))).toEqual(b);
   });
 
-  it("reads a version 1 file, dropping the ramp each override named", () => {
-    const b = acme();
-    const v1 = {
-      ...b,
-      version: 1,
-      assignment: { ...b.assignment, charts: undefined },
-      overrides: {
-        light: { primary: { ramp: "brand", step: 7 } },
-        dark: { ring: { ramp: "brand", solve: true, from: "end" } },
-      },
-    };
-    expect(parse(JSON.stringify(v1))).toEqual({
-      ...b,
-      overrides: {
-        light: { primary: { step: 7 } },
-        dark: { ring: { solve: true, from: "end" } },
-      },
-    });
-  });
-
   it("names what is wrong", () => {
-    expect(() => parse("[]")).toThrow(/version/);
-    expect(() => parse(JSON.stringify({ ...acme(), version: 3 }))).toThrow(
-      /version 3 is not 2/,
+    const b = acme();
+    expect(() => parse("[]")).toThrow(/id is not a string/);
+    expect(() => parse(JSON.stringify({ ...b, gamut: "rec2020" }))).toThrow(
+      /gamut rec2020/,
+    );
+    expect(() => parse(JSON.stringify({ ...b, primary: "#fff" }))).toThrow(
+      /primary is not a color/,
+    );
+    expect(() => parse(JSON.stringify({ ...b, harmony: "square" }))).toThrow(
+      /harmony square is not one of/,
     );
     expect(() =>
-      parse(JSON.stringify({ ...acme(), gamut: "rec2020" })),
-    ).toThrow(/gamut rec2020/);
-    expect(() =>
-      parse(
-        JSON.stringify({
-          ...acme(),
-          assignment: { neutral: "gray", primary: "brand", destructive: "red" },
-        }),
-      ),
+      parse(JSON.stringify({ ...b, assignment: { neutral: "gray" } })),
     ).toThrow(/neutral names ramp "gray"/);
     expect(() =>
-      parse(JSON.stringify({ ...acme(), assignment: { neutral: "gray" } })),
-    ).toThrow(/primary names no ramp/);
-    const b = acme();
-    expect(() =>
-      parse(
-        JSON.stringify({
-          ...b,
-          assignment: { ...b.assignment, "chart-6": "brand" },
-        }),
-      ),
+      parse(JSON.stringify({ ...b, assignment: { "chart-6": "primary" } })),
     ).toThrow(/"chart-6" is not a role/);
     expect(() =>
       parse(

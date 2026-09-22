@@ -1,4 +1,4 @@
-/** Brands live in localStorage; a JSON file is the way out and in. */
+/** Brands live in localStorage; a JSON file is the way out. */
 
 import { parse, serialize, type Brand } from "@/lib/brand.ts";
 

@@ -38,6 +38,8 @@ export const HARMONY_KINDS = {
   triadic: [-120, 120],
   /** The complementary's neighbours. */
   "split-complementary": [150, 210],
+  /** Four hues at even quarters: the square. */
+  tetradic: [90, 180, 270],
 } as const satisfies Record<string, readonly number[]>;
 
 export type HarmonyKind = keyof typeof HARMONY_KINDS;

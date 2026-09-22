@@ -1,77 +1,24 @@
-import { inspectRamp, type OkLCH, type TokenAudit } from "@jamiethompson/oklch";
-import { useMemo, useState } from "react";
+import {
+  HARMONY_KINDS,
+  inspectRamp,
+  type OkLCH,
+  type TokenAudit,
+} from "@jamiethompson/oklch";
+import { useMemo } from "react";
 
+import { Field } from "@/components/Field.tsx";
 import { Swatch } from "@/components/Swatch.tsx";
 import { Verdict } from "@/components/Verdict.tsx";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import {
   rampOf,
   ROLES,
-  rolesOf,
   type Brand,
   type BrandRamp,
-  type RampSeed,
   type Role,
-  type Stops,
 } from "@/lib/brand.ts";
 import { fixed, stopName } from "@/lib/format.ts";
 import { usedBy, type Usage } from "@/lib/usage.ts";
-
-function Field({
-  label,
-  value,
-  min,
-  max,
-  step,
-  digits = 3,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  digits?: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <div className="grid grid-cols-[3rem_1fr_4rem] items-center gap-2">
-      <Label className="text-xs">{label}</Label>
-      <Slider
-        aria-label={label}
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onValueChange={(v) => onChange(Array.isArray(v) ? v[0]! : v)}
-      />
-      <Input
-        aria-label={`${label} value`}
-        className="h-7 px-1 font-mono text-xs"
-        type="number"
-        min={min}
-        max={max}
-        step={step}
-        value={fixed(value, digits)}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          if (Number.isFinite(n)) onChange(n);
-        }}
-      />
-    </div>
-  );
-}
 
 /** How a token came to sit on this step. */
 function howOf(brand: Brand, a: TokenAudit): "override" | "solved" | "picked" {
@@ -81,12 +28,21 @@ function howOf(brand: Brand, a: TokenAudit): "override" | "solved" | "picked" {
     : "picked";
 }
 
+/** What drew this ramp: the seed's hue, or the offset from it. */
+function subtitleOf(brand: Brand, ramp: BrandRamp): string {
+  const hue = `H ${fixed(ramp.steps[5]?.H ?? 0, 1)}°`;
+  const n = ramp.name.match(/^harmony-(\d+)$/);
+  if (n === null) return hue;
+  const offset = HARMONY_KINDS[brand.harmony][Number(n[1]) - 1] ?? 0;
+  return `${offset > 0 ? "+" : ""}${offset}° → ${hue}`;
+}
+
 /**
  * One ramp: its roles, its steps, and the step the eye has selected, with
  * every token that lands on that step and each one's verdict on its own
  * surface. The roles are how a ramp reaches the tokens: a token's ramp is
  * its role's, so a ramp that plays nothing colors nothing. The sliders
- * move the selected step; the seed redraws the ramp.
+ * move the selected step; the seeds in the rail redraw the ramp.
  */
 export function RampEditor({
   brand,
@@ -96,9 +52,7 @@ export function RampEditor({
   onSelect,
   onShowToken,
   onRole,
-  onSeed,
   onStep,
-  onRemove,
 }: {
   brand: Brand;
   ramp: BrandRamp;
@@ -109,28 +63,14 @@ export function RampEditor({
   onShowToken: (a: TokenAudit) => void;
   /** Give this ramp a role. */
   onRole: (role: Role) => void;
-  onSeed: (seed: RampSeed) => void;
   onStep: (index: number, step: OkLCH) => void;
-  onRemove: () => void;
 }) {
-  const [error, setError] = useState<string | null>(null);
   const report = useMemo(
     () => inspectRamp(ramp.steps, brand.gamut),
     [ramp.steps, brand.gamut],
   );
-  const seed = ramp.seed;
-  const roles = rolesOf(brand, ramp.name);
   const onStepTokens = (i: number) =>
     usedBy(usage, { ramp: ramp.name, step: i });
-
-  const reseed = (next: RampSeed) => {
-    try {
-      onSeed(next);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
 
   return (
     <section
@@ -140,6 +80,9 @@ export function RampEditor({
     >
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{ramp.name}</h3>
+        <span className="font-mono text-xs text-muted-foreground">
+          {subtitleOf(brand, ramp)}
+        </span>
         <div
           className="flex flex-wrap gap-1"
           role="group"
@@ -171,15 +114,6 @@ export function RampEditor({
             );
           })}
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="ml-auto"
-          onClick={onRemove}
-          disabled={roles.length > 0}
-        >
-          Remove
-        </Button>
       </div>
 
       <div
@@ -191,6 +125,7 @@ export function RampEditor({
           const tokens = onStepTokens(i);
           const failing = tokens.some((a) => a.outcome.kind !== "clears");
           const isSelected = i === selected;
+          const isSeed = ramp.seed === i;
           return (
             <button
               key={i}
@@ -198,9 +133,10 @@ export function RampEditor({
               aria-label={`${ramp.name} ${stopName(i)}`}
               aria-pressed={isSelected}
               title={
-                tokens.length === 0
+                (isSeed ? "the seed, exactly\n" : "") +
+                (tokens.length === 0
                   ? "No token lands here"
-                  : tokens.map((a) => `${a.scheme} ${a.token}`).join("\n")
+                  : tokens.map((a) => `${a.scheme} ${a.token}`).join("\n"))
               }
               onClick={() => onSelect(i)}
               className="min-w-0 flex-1"
@@ -212,11 +148,14 @@ export function RampEditor({
                     ? "w-full ring-2 ring-ring ring-offset-2 ring-offset-background"
                     : failing
                       ? "w-full ring-2 ring-destructive ring-offset-1 ring-offset-background"
-                      : "w-full"
+                      : isSeed
+                        ? "w-full ring-2 ring-foreground ring-offset-1 ring-offset-background"
+                        : "w-full"
                 }
               />
               <span className="block text-center text-[10px] text-muted-foreground">
                 {stopName(i)}
+                {isSeed ? " ·" : ""}
               </span>
               <span
                 className={
@@ -229,7 +168,7 @@ export function RampEditor({
                     : `${tokens.length} token${tokens.length === 1 ? "" : "s"} on ${ramp.name} ${stopName(i)}`
                 }
               >
-                {tokens.length > 0 ? tokens.length : " "}
+                {tokens.length > 0 ? tokens.length : " "}
               </span>
             </button>
           );
@@ -248,106 +187,6 @@ export function RampEditor({
           onStep={onStep}
         />
       )}
-
-      <details className="grid gap-2 text-sm">
-        <summary className="cursor-pointer text-muted-foreground">
-          Redraw the ramp
-        </summary>
-        <div className="mt-2 grid gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              value={seed.kind}
-              onValueChange={(v) =>
-                v !== null &&
-                reseed(
-                  v === "hue"
-                    ? {
-                        kind: "hue",
-                        hue: 260,
-                        saturation: 0.8,
-                        stops: seed.stops,
-                        hueShift: seed.hueShift,
-                      }
-                    : {
-                        kind: "through",
-                        color: "#2563eb",
-                        stops: seed.stops,
-                        hueShift: seed.hueShift,
-                      },
-                )
-              }
-              items={{ hue: "from a hue", through: "through a color" }}
-            >
-              <SelectTrigger aria-label="Draw from" className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="hue">from a hue</SelectItem>
-                <SelectItem value="through">through a color</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={seed.stops}
-              onValueChange={(v) =>
-                v !== null && reseed({ ...seed, stops: v as Stops })
-              }
-              items={{ chromatic: "chromatic stops", neutral: "neutral stops" }}
-            >
-              <SelectTrigger aria-label="Stops" className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="chromatic">chromatic stops</SelectItem>
-                <SelectItem value="neutral">neutral stops</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {seed.kind === "hue" ? (
-            <>
-              <Field
-                label="hue"
-                value={seed.hue}
-                min={0}
-                max={360}
-                step={1}
-                digits={0}
-                onChange={(hue) => reseed({ ...seed, hue })}
-              />
-              <Field
-                label="sat"
-                value={seed.saturation}
-                min={0}
-                max={1}
-                step={0.01}
-                digits={2}
-                onChange={(saturation) => reseed({ ...seed, saturation })}
-              />
-            </>
-          ) : (
-            <div className="grid grid-cols-[3rem_1fr] items-center gap-2">
-              <Label className="text-xs">color</Label>
-              <Input
-                aria-label="Through color"
-                className="h-7 font-mono text-xs"
-                value={seed.color}
-                onChange={(e) => reseed({ ...seed, color: e.target.value })}
-              />
-            </div>
-          )}
-          <Field
-            label="shift"
-            value={seed.hueShift}
-            min={-60}
-            max={60}
-            step={1}
-            digits={0}
-            onChange={(hueShift) => reseed({ ...seed, hueShift })}
-          />
-          {error !== null && (
-            <p className="text-xs text-destructive">{error}</p>
-          )}
-        </div>
-      </details>
     </section>
   );
 }

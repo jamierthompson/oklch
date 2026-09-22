@@ -15,10 +15,10 @@ describe("usageOf", () => {
     expect(names("neutral", 0)).toEqual(
       expect.arrayContaining(["light/background", "dark/foreground"]),
     );
-    // Primary is picked at brand-800 in light.
-    expect(names("brand", 8)).toContain("light/primary");
+    // Primary is picked at primary-800 in light.
+    expect(names("primary", 8)).toContain("light/primary");
     // A step nothing lands on has no tokens.
-    expect(names("brand", 5)).toEqual([]);
+    expect(names("red", 0)).toEqual([]);
   });
 
   it("skips a token with no color, and reports where a solve landed", () => {

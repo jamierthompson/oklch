@@ -21,7 +21,7 @@ describe("App", () => {
     for (const s of SEEDS)
       expect(screen.getByRole("button", { name: s.name })).toBeInTheDocument();
     expect(screen.queryByTestId("preview-light")).not.toBeInTheDocument();
-    expect(screen.getByTestId("preview-empty")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Seeds")).not.toBeInTheDocument();
     expect(storedNames()).toEqual([]);
   });
 
@@ -35,6 +35,15 @@ describe("App", () => {
     expect(light.style.getPropertyValue("--primary")).toMatch(/^oklch\(/);
     expect(dark).toHaveClass("dark");
     expect(storedNames()).toEqual([]);
+    // The rail shows the seed the draft was drawn through.
+    const rail = within(screen.getByLabelText("Seeds"));
+    expect(rail.getByLabelText("Primary color")).toHaveValue(
+      SEEDS.find((s) => s.name === "Forest")!.color,
+    );
+    expect(rail.getByRole("button", { name: "Analogous" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     // The seeds stay in the header, and the one the draft came from is marked.
     expect(screen.getByRole("button", { name: "Forest" })).toHaveAttribute(
       "aria-pressed",

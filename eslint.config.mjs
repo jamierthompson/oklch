@@ -29,7 +29,7 @@ export default defineConfig([
     },
   },
   {
-    files: ["examples/**/*.ts", "apps/**/*.{ts,tsx}"],
+    files: ["apps/**/*.{ts,tsx}"],
     languageOptions: { globals: globals.browser },
   },
   prettier,

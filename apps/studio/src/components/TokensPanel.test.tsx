@@ -22,8 +22,12 @@ describe("TokensPanel", () => {
     expect(screen.queryAllByRole("combobox", { name: /ramp$/ })).toHaveLength(
       0,
     );
-    expect(within(rowOf("primary")).getAllByText("brand")).toHaveLength(2);
-    expect(within(rowOf("chart-2")).getAllByText("brand")).toHaveLength(2);
+    expect(
+      within(rowOf("primary")).getAllByTitle(/is on the primary ramp/),
+    ).toHaveLength(2);
+    expect(
+      within(rowOf("chart-2")).getAllByTitle(/is on the harmony-1 ramp/),
+    ).toHaveLength(2);
     const background = rowOf("background");
     expect(within(background).getAllByText("no pairing")).toHaveLength(2);
     const foreground = rowOf("foreground");

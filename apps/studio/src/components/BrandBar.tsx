@@ -1,5 +1,6 @@
+import { formatHex } from "@jamiethompson/oklch";
+
 import { withGamut, type Brand } from "@/lib/brand.ts";
-import { useRef } from "react";
 
 import { SeedPicker } from "@/components/SeedPicker.tsx";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +26,6 @@ export function BrandBar({
   onSelect,
   onUpdate,
   onSave,
-  onOpen,
   onDuplicate,
   onRemove,
 }: {
@@ -37,21 +37,9 @@ export function BrandBar({
   onSelect: (id: string) => void;
   onUpdate: (b: Brand) => void;
   onSave: () => void;
-  onOpen: (file: File | undefined) => void;
   onDuplicate: () => void;
   onRemove: () => void;
 }) {
-  const file = useRef<HTMLInputElement>(null);
-  const fileInput = (
-    <input
-      ref={file}
-      type="file"
-      accept="application/json,.json"
-      className="hidden"
-      onChange={(e) => onOpen(e.target.files?.[0])}
-    />
-  );
-
   if (brand === null) {
     return (
       <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
@@ -59,14 +47,6 @@ export function BrandBar({
         <span className="text-sm text-muted-foreground">
           No brands on this machine yet.
         </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => file.current?.click()}
-        >
-          Open file
-        </Button>
-        {fileInput}
       </header>
     );
   }
@@ -75,8 +55,7 @@ export function BrandBar({
     ...(draft === null ? {} : { [DRAFT]: `Draft · ${draft.name}` }),
     ...Object.fromEntries(brands.map((b) => [b.id, b.name])),
   };
-  const seed = brand.ramps.find((r) => r.seed.kind === "through")?.seed;
-  const current = seed?.kind === "through" ? seed.color : undefined;
+  const current = formatHex(brand.primary).hex;
 
   return (
     <header className="grid gap-3 border-b px-4 py-3">
@@ -145,10 +124,6 @@ export function BrandBar({
         >
           Save file
         </Button>
-        <Button variant="outline" onClick={() => file.current?.click()}>
-          Open file
-        </Button>
-        {fileInput}
         <Button variant="destructive" onClick={onRemove}>
           {isDraft ? "Discard draft" : "Delete"}
         </Button>

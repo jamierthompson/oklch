@@ -28,16 +28,18 @@ export function rotateHue(
   return gamutMap({ L: c.L, C: c.C, H: wrapHue(c.H + degrees) }, g);
 }
 
-/** Colour-theory relationships and their hue offsets from the seed, in degrees. */
+/** Color-theory relationships and their hue offsets from the seed, in degrees. */
 export const HARMONY_KINDS = {
   /** The opposite hue. */
   complementary: [180],
-  /** The neighbours on the wheel. */
+  /** The neighbors on the wheel. */
   analogous: [-30, 30],
   /** Three hues at even thirds. */
   triadic: [-120, 120],
-  /** The complementary's neighbours. */
+  /** The complementary's neighbors. */
   "split-complementary": [150, 210],
+  /** Four hues at even quarters: the square. */
+  tetradic: [90, 180, 270],
 } as const satisfies Record<string, readonly number[]>;
 
 export type HarmonyKind = keyof typeof HARMONY_KINDS;
@@ -57,7 +59,7 @@ export interface Harmony {
  *
  * Each derived color is the seed rotated by the relationship's offsets and
  * gamut-mapped. Takes a valid OkLCH: the caller parses, and there is no
- * fallback seed. Throws on a kind that is not colour-theory vocabulary, a
+ * fallback seed. Throws on a kind that is not color-theory vocabulary, a
  * non-finite channel, or a missing gamut.
  */
 export function harmony(seed: OkLCH, kind: HarmonyKind, gamut: Gamut): Harmony {

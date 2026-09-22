@@ -1,4 +1,4 @@
-import { auditOf, newBrand, withOverride } from "@jamiethompson/oklch-brand";
+import { auditOf, newBrand, withOverride } from "@/lib/brand.ts";
 import { describe, expect, it } from "vitest";
 
 import { landedOn, usageOf, usedBy } from "./usage.ts";
@@ -15,19 +15,16 @@ describe("usageOf", () => {
     expect(names("neutral", 0)).toEqual(
       expect.arrayContaining(["light/background", "dark/foreground"]),
     );
-    // Primary is picked at brand-800 in light.
-    expect(names("brand", 8)).toContain("light/primary");
+    // Primary is picked at primary-800 in light.
+    expect(names("primary", 8)).toContain("light/primary");
     // A step nothing lands on has no tokens.
-    expect(names("brand", 5)).toEqual([]);
+    expect(names("red", 0)).toEqual([]);
   });
 
   it("skips a token with no color, and reports where a solve landed", () => {
     // A red step 0 on background does not clear, so every ink on it stays unresolved? No:
     // a failing pick keeps its color. Only a solve with no clearing step is unresolved.
-    const brand = withOverride(acme(), "light", "foreground", {
-      ramp: "neutral",
-      step: 1,
-    });
+    const brand = withOverride(acme(), "light", "foreground", { step: 1 });
     const audit = auditOf(brand);
     const foreground = audit.light.find((a) => a.token === "foreground")!;
     expect(foreground.outcome.kind).toBe("fails");

@@ -42,7 +42,7 @@ const SAMPLES = 256;
  * from nothing at the surface. Walking that curve at an even rate does not
  * walk it at an even *perceived* rate, so the curve is sampled, the ΔEOK
  * along it accumulated, and the table inverted — `at(t)` is parameterized
- * by distance travelled. Every color returned is inside the gamut by
+ * by distance traveled. Every color returned is inside the gamut by
  * construction, because chroma never exceeds the safe prefix.
  *
  * For data (a heatmap, an activation), not for palettes: a palette is a
@@ -90,13 +90,13 @@ export function createScale(options: ScaleOptions): Scale {
   };
 
   const samples: OkLCH[] = [];
-  const travelled: number[] = [0];
+  const traveled: number[] = [0];
   let total = 0;
   for (let i = 0; i < SAMPLES; i += 1) {
     const p = point(i / (SAMPLES - 1));
     if (i > 0) {
       total += deltaEOK(samples[i - 1]!, p);
-      travelled.push(total);
+      traveled.push(total);
     }
     samples.push(p);
   }
@@ -111,11 +111,11 @@ export function createScale(options: ScaleOptions): Scale {
     let high = SAMPLES - 1;
     while (high - low > 1) {
       const mid = (low + high) >> 1;
-      if (travelled[mid]! <= target) low = mid;
+      if (traveled[mid]! <= target) low = mid;
       else high = mid;
     }
-    const span = travelled[high]! - travelled[low]!;
-    const within = span === 0 ? 0 : (target - travelled[low]!) / span;
+    const span = traveled[high]! - traveled[low]!;
+    const within = span === 0 ? 0 : (target - traveled[low]!) / span;
     const a = samples[low]!;
     const b = samples[high]!;
     return {

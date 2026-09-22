@@ -1,21 +1,13 @@
 import type { TokenAudit, TokenSetAudit } from "@jamiethompson/oklch";
 import { useMemo, useState } from "react";
 
+import { Preview } from "@/components/Preview.tsx";
 import { RampEditor } from "@/components/RampEditor.tsx";
 import { tokenCellId, TokensPanel } from "@/components/TokensPanel.tsx";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  withoutRamp,
-  withRamp,
-  withSeed,
-  withStep,
-  type Brand,
-} from "@jamiethompson/oklch-brand";
+import { withRole, withStep, type Brand } from "@/lib/brand.ts";
 import { usageOf, type StepRef } from "@/lib/usage.ts";
 
-/** The step selected when nothing has been: the first ramp's middle. */
+/** The step selected when nothing has been: the primary's seed step, else its middle. */
 const DEFAULT_STEP = 5;
 
 function scrollTo(id: string) {
@@ -24,10 +16,32 @@ function scrollTo(id: string) {
     ?.scrollIntoView?.({ block: "center", behavior: "smooth" });
 }
 
+function Section({
+  title,
+  aside,
+  children,
+}: {
+  title: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="grid gap-3" aria-label={title.toLowerCase()}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-medium">{title}</h2>
+        {aside}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 /**
- * The palette as one view: the ramps and the tokens bound to them, sharing
+ * The palette as one page: the ramps the seeds drafted, real components
+ * skinned by the tokens as they stand, and the tokens themselves, sharing
  * one selected step. A step shows the tokens that land on it; a token
- * locates the step it came from. Roles are given on the ramp that plays them.
+ * locates the step it came from. Roles are given on the ramp that plays
+ * them, and a token's ramp is its role's: the eye moves steps, not ramps.
  */
 export function PalettePanel({
   brand,
@@ -39,97 +53,78 @@ export function PalettePanel({
   onUpdate: (b: Brand) => void;
 }) {
   const [selected, setSelected] = useState<StepRef | null>(null);
-  const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const usage = useMemo(() => usageOf(audit), [audit]);
 
   // A selection that names a ramp the brand no longer has falls back.
-  const first = brand.ramps[0]?.name;
+  const primary = brand.ramps.find((r) => r.name === "primary");
   const selection: StepRef | null =
     selected !== null && brand.ramps.some((r) => r.name === selected.ramp)
       ? selected
-      : first === undefined
+      : primary === undefined
         ? null
-        : { ramp: first, step: DEFAULT_STEP };
+        : { ramp: primary.name, step: primary.seed ?? DEFAULT_STEP };
 
-  const attempt = (f: () => Brand) => {
-    try {
-      onUpdate(f());
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
   const locate = (ref: StepRef) => {
     setSelected(ref);
     scrollTo(`ramp-${ref.ramp}`);
   };
   const showToken = (a: TokenAudit) => scrollTo(tokenCellId(a.scheme, a.token));
+  const failing = [...audit.light, ...audit.dark].filter(
+    (a) => a.outcome.kind !== "clears",
+  ).length;
 
   return (
-    <div className="grid gap-4">
-      {brand.ramps.map((ramp) => (
-        <RampEditor
-          key={ramp.name}
-          brand={brand}
-          ramp={ramp}
-          usage={usage}
-          selected={selection?.ramp === ramp.name ? selection.step : null}
-          onSelect={(step) => setSelected({ ramp: ramp.name, step })}
-          onShowToken={showToken}
-          onRole={(role) =>
-            onUpdate({
-              ...brand,
-              assignment: { ...brand.assignment, [role]: ramp.name },
-            })
-          }
-          onSeed={(seed) => onUpdate(withSeed(brand, ramp.name, seed))}
-          onStep={(i, s) => onUpdate(withStep(brand, ramp.name, i, s))}
-          onRemove={() => attempt(() => withoutRamp(brand, ramp.name))}
-        />
-      ))}
-
-      <section
-        className="flex flex-wrap items-end gap-2 rounded-lg border p-3"
-        aria-label="add ramp"
+    <div className="grid gap-8">
+      <Section
+        title="Ramps"
+        aside={
+          <p className="text-xs text-muted-foreground">
+            The outlined step is the seed, exactly. Select a step to move it; a
+            red ring marks a step with a token that does not clear.
+          </p>
+        }
       >
-        <div className="grid gap-1">
-          <Label htmlFor="ramp-name">Add a ramp</Label>
-          <Input
-            id="ramp-name"
-            className="w-40"
-            placeholder="name, e.g. teal"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+        {brand.ramps.map((ramp) => (
+          <RampEditor
+            key={ramp.name}
+            brand={brand}
+            ramp={ramp}
+            usage={usage}
+            selected={selection?.ramp === ramp.name ? selection.step : null}
+            onSelect={(step) => setSelected({ ramp: ramp.name, step })}
+            onShowToken={showToken}
+            onRole={(role) => onUpdate(withRole(brand, role, ramp.name))}
+            onStep={(i, s) => onUpdate(withStep(brand, ramp.name, i, s))}
           />
-        </div>
-        <Button
-          variant="outline"
-          onClick={() =>
-            attempt(() => {
-              const b = withRamp(brand, name.trim(), {
-                kind: "hue",
-                hue: 180,
-                saturation: 0.7,
-                stops: "chromatic",
-                hueShift: 0,
-              });
-              setName("");
-              return b;
-            })
-          }
-        >
-          Draw
-        </Button>
-        {error !== null && <p className="text-sm text-destructive">{error}</p>}
-      </section>
+        ))}
+      </Section>
 
-      <section className="grid gap-2" aria-label="tokens">
-        <h3 className="font-medium">Tokens</h3>
-        <p className="text-xs text-muted-foreground">
-          Every shadcn variable, in both schemes. A swatch shows the step it
-          came from; the highlighted cells sit on the selected step.
-        </p>
+      <Section
+        title="Preview"
+        aside={
+          <p className="text-xs text-muted-foreground">
+            Real shadcn components, both schemes, read from the tokens as they
+            stand. Nothing here is hand-tuned.
+          </p>
+        }
+      >
+        <div className="grid gap-4 2xl:grid-cols-2">
+          <Preview brand={brand} audit={audit} scheme="light" />
+          <Preview brand={brand} audit={audit} scheme="dark" />
+        </div>
+      </Section>
+
+      <Section
+        title="Tokens"
+        aside={
+          <p className="text-xs text-muted-foreground">
+            Every shadcn variable, in both schemes, on the ramp its role plays.
+            A swatch shows the step it came from; the highlighted cells sit on
+            the selected step.
+            {failing > 0 ? ` ${failing} do not clear.` : ""}
+          </p>
+        }
+      >
         <TokensPanel
           brand={brand}
           audit={audit}
@@ -137,7 +132,7 @@ export function PalettePanel({
           onLocate={locate}
           onUpdate={onUpdate}
         />
-      </section>
+      </Section>
     </div>
   );
 }

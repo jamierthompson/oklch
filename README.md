@@ -1,146 +1,95 @@
 # oklch
 
-A thin contract over [colorjs.io](https://colorjs.io) for OKLCH design work.
-Every function refuses by name, reports what moved, and never clamps, rounds, or
-falls back.
+A brand palette studio for shadcn/ui, and the OKLCH library under it. Two
+seeds in, a theme out, with every step still yours to move and a verdict
+beside it.
 
-colorjs.io does the math. This package decides what the math is allowed to say.
-It drafts a ramp the eye then moves, binds the steps to the roles a system
-needs — shadcn/ui's, out of the box — and gives every pairing a verdict with its
-standard named. It never signs off.
+## Why this exists
 
-## Install
+The engine before this one took a seed and never threw: a fully solved
+theme every time, even from garbage, with a receipt for every token. It
+worked, and it was the wrong promise. A palette is not finished when it
+measures right. It is finished when someone looks at it and says so, and no
+solver can do that part.
+
+Tailwind is the proof. Its palette is built in OKLCH, and it still does not
+step lightness the same way for every hue. The 500 step sits at L 0.795 for
+yellow and L 0.585 for indigo, because "looks like a yellow" beat "measures
+the same." Someone with eyes chose that. A formula drafts; an eye signs off.
+
+So this tool draws the draft, makes the eye fast, and never signs off.
+
+## The studio
+
+`apps/studio` opens empty. Try a color and it drafts a whole palette in
+memory: a neutral tinted to the color's hue, the primary ramp through the
+color so the color is a step exactly, a red, and one ramp per harmony of the
+hue. A second seed adds a secondary ramp. The rail on the right holds the two
+seeds and the harmony; everything on the page is a pure function of them.
+
+The ramps are the work. Every step has sliders, and moving one changes every
+token that lands on it. The tokens are shadcn/ui's thirty-one variables, in
+light and dark, each on the ramp its role plays: `primary` on the primary
+ramp, `accent` on the first harmony, the chart series across the chromatic
+ramps. Roles are set on the ramp that plays them. Surfaces are picked steps;
+inks are solved on their surface, and a pick or a solve that does not clear
+is shown failing, with the WCAG ratio and the APCA Lc it measured. Real
+shadcn components render the palette as it stands, failures included.
+
+Once every pairing clears, the set ships as shadcn's `:root` / `.dark` /
+`@theme inline` CSS, a `registry:theme` item for `npx shadcn add`, or DTCG
+tokens. Nothing ships before that. There is no fallback color.
+
+Saved brands persist in the browser. A draft lives only in the page until
+it is saved.
+
+## The library
+
+`packages/oklch` is a thin contract over [colorjs.io](https://colorjs.io):
+colorjs.io does the math, the package decides what the math is allowed to
+say. Every function refuses by name, reports what moved, and never clamps,
+rounds, or falls back. P3 is first-class, sRGB is the fallback, and every
+gamut-aware function takes the gamut because a default would be a silent
+decision.
 
 ```bash
 pnpm add @jamiethompson/oklch
 ```
 
-## What it answers
+Three tiers, each built from the one below through its public surface only,
+and an architectural test that fails if one reaches past that.
 
-Tier 1: one color, or one pair. P3 is first-class and sRGB is the fallback; every
-gamut-aware function takes the gamut, and a missing one throws.
-
-| Function                              | The question it answers                                            |
-| ------------------------------------- | ------------------------------------------------------------------ |
-| `parseColor(string)`                  | What did I type?                                                   |
-| `maxChroma(L, H, gamut)`              | How vivid can this step be?                                        |
-| `inGamut(color, gamut)`               | Is this displayable on this screen?                                |
-| `gamutMap(color, gamut)`              | Where does it land if not?                                         |
-| `deltaEOK(a, b)`                      | How far is this step from its neighbour?                           |
-| `contrastWCAG` / `contrastAPCA`       | What does this pairing measure?                                    |
-| `checkContrast(text, bg, target)`     | Does this pairing clear?                                           |
-| `solveBackground(text, target, opts)` | I've placed an ink — how far can the surface move before it fails? |
-| `solveForeground(bg, target, opts)`   | I've placed a surface — what's the nearest ink that clears on it?  |
-| `rotateHue(color, degrees, gamut)`    | What's this color at another hue?                                  |
-| `harmony(seed, kind, gamut)`          | Which hues are in harmony with this one?                           |
-| `formatOklch(color)`                  | What does the stylesheet get?                                      |
-| `formatHex(color)`                    | What does a hex-only consumer get?                                 |
-
-Tier 2: a list of steps. Built from Tier 1's public surface alone, and an
-architectural test in `tests/` fails if it imports anything else.
-
-| Function                    | The question it answers                                                 |
-| --------------------------- | ----------------------------------------------------------------------- |
-| `inspectRamp(steps, gamut)` | What does each step I placed measure, and how do the neighbours relate? |
-| `minPass(ramp, bg, target)` | Which is the first step that clears on this surface?                    |
-| `createScale(options)`      | Equal steps in data → equal perceived steps? (for data, not palettes)   |
-| `createRamp(options)`       | A ramp to start from: a draft through a hue or a brand color, in gamut  |
-
-Tier 3: a whole system. Steps bound to semantic roles, with a receipt per
-pairing, and shipped.
-
-| Function                            | The question it answers                                                  |
-| ----------------------------------- | ------------------------------------------------------------------------ |
-| `resolveBinding(binding, context)`  | Bind one token: pick a step by eye, or solve for the first that clears.  |
-| `buildTokenSet(spec)`               | Bind these ramps to these roles, in both schemes: a set, or a refusal.   |
-| `auditTokenSet(spec)`               | Every token's verdict, without a refusal ending the walk. For an editor. |
-| `shadcnBindings(assignment, ramps)` | shadcn/ui's variables bound to these ramps, in both schemes.             |
-| `tokenSetToDeclarations(set)`       | What does this ship as, in plain CSS?                                    |
-| `tokenSetToTailwindTheme(set)`      | What does this ship as, for Tailwind v4?                                 |
-| `tokenSetToDesignTokens(set)`       | What does this ship as, for a token pipeline?                            |
+| Tier | What it answers                                                         |
+| ---- | ----------------------------------------------------------------------- |
+| 1    | One color or one pair: parse, gamut, distance, contrast, solve, hue.    |
+| 2    | A list of steps: draft a ramp, inspect one, find the first that clears. |
+| 3    | A whole system: bind steps to roles with a receipt per pairing, ship.   |
 
 ```ts
-import {
-  CONTRAST_TARGETS,
-  gamutMap,
-  parseColor,
-  solveForeground,
-} from "@jamiethompson/oklch";
+import { createRamp, minPass, CONTRAST_TARGETS } from "@jamiethompson/oklch";
 
-const surface = parseColor("oklch(0.7 0.1 150)"); // null if it isn't a color
-if (surface === null) throw new Error("not a color");
-
-// What does a non-P3 screen get? A report, not a bare color.
-const fallback = gamutMap(surface, "srgb");
-fallback.moved; // false — this one fits
-
-// Nearest ink that clears body text, toward both poles. No guessed direction.
-const ink = solveForeground(surface, CONTRAST_TARGETS.bodyText, {
-  ink: { C: 0.1, H: 150 },
-  gamut: "p3",
-});
-ink.toward.light; // null — nothing light enough clears on this surface
-ink.toward.dark?.check.apca.margin; // how much room the dark ink has
+const ramp = createRamp({ through: brand, gamut: "srgb" }); // a draft, not a palette
+const ink = minPass(ramp.steps, surface, CONTRAST_TARGETS.bodyText); // the first step that clears, with its readings
 ```
 
-## Posture
-
-- **Parsers return null. Everything else throws by name**, naming the violation
-  and the legal alternative.
-- **Angles wrap, amounts refuse.** Hue −30 is 330; chroma −0.1 is an error.
-- **Map, never clip; map before measuring.** The contrast meters refuse
-  out-of-sRGB input.
-- **No rounding, no normalization** between what was asked and what ships.
-  colorjs.io's defaults do both; every call site opts out.
-- **Every output is a report.** The library never signs off.
-
-See [docs/concepts/architecture.md](docs/concepts/architecture.md).
-
-## The studio
-
-`apps/studio` is the tool the library exists for: a brand color in, shadcn's
-theme out, with every step still the eye's to move. It opens empty. Trying a
-seed color, or one of your own, drafts a palette in memory: a tinted neutral,
-the brand ramp through the color, and a red; binds all 31 shadcn variables;
-shows a verdict per token in both schemes, with real shadcn components skinned
-by the palette as it stands; and ships the set as shadcn CSS, a `registry:theme`
-item, or DTCG tokens once every pairing clears. A draft lives only in the page
-until you save it as a brand; saved brands persist in the browser and travel as
-JSON files, and the seeds stay in the header to try another at any time.
-
-## The brand file and the CLI
-
-`@jamiethompson/oklch-brand` is the document the studio edits, as a package:
-the ramps, which ramp plays which role, and the eye's overrides, with pure
-functions from it to bindings, a verdict per token, and the files that ship.
-Save a brand from the studio, commit it next to your app, and let the CLI
-regenerate the theme in CI:
-
-```bash
-pnpm add -D @jamiethompson/oklch-brand
-pnpm oklch-brand check acme.oklch.json          # a verdict per token; exit 1 unless all clear
-pnpm oklch-brand build acme.oklch.json -o src   # acme.css, acme.registry.json, acme.tokens.json
-```
-
-Nothing is written unless every token clears. There is no fallback color.
+See [docs/concepts/architecture.md](docs/concepts/architecture.md) for the
+contract and the posture behind it.
 
 ## Develop
 
 ```bash
 pnpm install
-pnpm dev            # the studio, at http://localhost:5173
-pnpm dev:examples   # one example page per library function
-pnpm test           # contract tests, and the studio's model tests
-pnpm gate           # format, lint, typecheck, test, build — what CI runs
+pnpm dev     # the studio
+pnpm test    # the library's contract tests, and the studio's
+pnpm gate    # format, lint, typecheck, test, build — what CI runs
 ```
 
 ## Structure
 
 - `packages/oklch` — the library. Its only dependency is colorjs.io.
-- `packages/brand` — the brand document and the `oklch-brand` CLI.
-- `apps/studio` — the brand palette studio: React, Vite, Tailwind v4, shadcn/ui.
-- `examples` — one Vite page per function, each showing when you'd reach for it.
-- `tests` — the architectural test that keeps Tier 2 on Tier 1's public surface.
+- `apps/studio` — the studio: React, Vite, Tailwind v4, shadcn/ui. Its
+  `src/lib` holds the brand document and what ships from it.
+- `tests` — the architectural test that keeps each tier on the one below.
 - `docs/concepts` — the architecture and the contract.
 
 ## License

@@ -6,14 +6,14 @@ import { solveBackground, solveForeground } from "./solve.js";
 
 const BLACK = parseColor("#000")!;
 const WHITE = parseColor("#fff")!;
-const GREY = { C: 0, H: 0 };
+const GRAY = { C: 0, H: 0 };
 const BODY = CONTRAST_TARGETS.bodyText;
 const STEP = 1e-6;
 
 describe("solveBackground", () => {
   it("finds the darkest surface black text still clears, and one step darker fails", () => {
     const solved = solveBackground(BLACK, BODY, {
-      surface: GREY,
+      surface: GRAY,
       range: { safe: 1, limit: 0 },
       gamut: "srgb",
     });
@@ -41,7 +41,7 @@ describe("solveBackground", () => {
 
   it("returns the limit when the whole range clears", () => {
     const solved = solveBackground(BLACK, BODY, {
-      surface: GREY,
+      surface: GRAY,
       range: { safe: 1, limit: 0.9 },
       gamut: "srgb",
     });
@@ -51,7 +51,7 @@ describe("solveBackground", () => {
   it("throws by name when even the safe end fails", () => {
     expect(() =>
       solveBackground(BLACK, BODY, {
-        surface: GREY,
+        surface: GRAY,
         range: { safe: 0.3, limit: 0.1 },
         gamut: "srgb",
       }),
@@ -61,10 +61,10 @@ describe("solveBackground", () => {
   });
 
   it("refuses a range that straddles the text's lightness", () => {
-    const grey = { L: 0.5, C: 0, H: 0 };
+    const gray = { L: 0.5, C: 0, H: 0 };
     expect(() =>
-      solveBackground(grey, BODY, {
-        surface: GREY,
+      solveBackground(gray, BODY, {
+        surface: GRAY,
         range: { safe: 1, limit: 0 },
         gamut: "srgb",
       }),
@@ -76,14 +76,14 @@ describe("solveBackground", () => {
   it("refuses a range that is not finite or not a lightness", () => {
     expect(() =>
       solveBackground(BLACK, BODY, {
-        surface: GREY,
+        surface: GRAY,
         range: { safe: NaN, limit: 0 },
         gamut: "srgb",
       }),
     ).toThrow(/^solveBackground: range.safe is NaN/);
     expect(() =>
       solveBackground(BLACK, BODY, {
-        surface: GREY,
+        surface: GRAY,
         range: { safe: 1.5, limit: 0 },
         gamut: "srgb",
       }),
@@ -93,7 +93,7 @@ describe("solveBackground", () => {
   it("refuses text outside the gamut being solved for", () => {
     expect(() =>
       solveBackground({ L: 0.6, C: 0.35, H: 30 }, BODY, {
-        surface: GREY,
+        surface: GRAY,
         range: { safe: 1, limit: 0 },
         gamut: "p3",
       }),
@@ -104,7 +104,7 @@ describe("solveBackground", () => {
     expect(() =>
       // @ts-expect-error the contract under test
       solveBackground(BLACK, BODY, {
-        surface: GREY,
+        surface: GRAY,
         range: { safe: 1, limit: 0 },
       }),
     ).toThrow(/gamut is undefined/);
@@ -131,7 +131,7 @@ describe("solveBackground", () => {
 
   it("moves with the target: a stricter bar stops sooner", () => {
     const options = {
-      surface: GREY,
+      surface: GRAY,
       range: { safe: 1, limit: 0 },
       gamut: "srgb",
     } as const;
@@ -144,9 +144,9 @@ describe("solveBackground", () => {
 
 describe("solveForeground", () => {
   it("solves toward both poles and names the nearer", () => {
-    const grey = { L: 0.6, C: 0, H: 0 };
-    const solved = solveForeground(grey, CONTRAST_TARGETS.interfaceElement, {
-      ink: GREY,
+    const gray = { L: 0.6, C: 0, H: 0 };
+    const solved = solveForeground(gray, CONTRAST_TARGETS.interfaceElement, {
+      ink: GRAY,
       gamut: "srgb",
     });
     expect(solved.toward.light).not.toBeNull();
@@ -157,9 +157,9 @@ describe("solveForeground", () => {
   });
 
   it("stops at the edge: one step closer to the surface fails", () => {
-    const grey = { L: 0.6, C: 0, H: 0 };
-    const solved = solveForeground(grey, CONTRAST_TARGETS.interfaceElement, {
-      ink: GREY,
+    const gray = { L: 0.6, C: 0, H: 0 };
+    const solved = solveForeground(gray, CONTRAST_TARGETS.interfaceElement, {
+      ink: GRAY,
       gamut: "srgb",
     });
     const light = solved.toward.light!;
@@ -167,14 +167,14 @@ describe("solveForeground", () => {
     expect(
       checkContrast(
         { L: light.lightness - STEP, C: 0, H: 0 },
-        grey,
+        gray,
         CONTRAST_TARGETS.interfaceElement,
       ).passes,
     ).toBe(false);
     expect(
       checkContrast(
         { L: dark.lightness + STEP, C: 0, H: 0 },
-        grey,
+        gray,
         CONTRAST_TARGETS.interfaceElement,
       ).passes,
     ).toBe(false);
@@ -185,7 +185,7 @@ describe("solveForeground", () => {
     // solver that picked by L >= 0.5 would have guessed on the other side.
     const light = { L: 0.8, C: 0, H: 0 };
     const solved = solveForeground(light, CONTRAST_TARGETS.largeText, {
-      ink: GREY,
+      ink: GRAY,
       gamut: "srgb",
     });
     expect(solved.toward.light).toBeNull();
@@ -198,7 +198,7 @@ describe("solveForeground", () => {
       solveForeground(
         { L: 0.5, C: 0, H: 0 },
         { wcag: 30, apca: 200 },
-        { ink: GREY, gamut: "srgb" },
+        { ink: GRAY, gamut: "srgb" },
       ),
     ).toThrow(/^solveForeground: no ink at chroma 0, hue 0 clears the target/);
   });
@@ -218,14 +218,14 @@ describe("solveForeground", () => {
   it("refuses a background outside the gamut, a missing gamut, and negative ink chroma", () => {
     expect(() =>
       solveForeground({ L: 0.6, C: 0.35, H: 30 }, BODY, {
-        ink: GREY,
+        ink: GRAY,
         gamut: "srgb",
       }),
     ).toThrow(
       /^solveForeground: background oklch\(0.6 0.35 30\) is outside srgb/,
     );
     // @ts-expect-error the contract under test
-    expect(() => solveForeground(WHITE, BODY, { ink: GREY })).toThrow(
+    expect(() => solveForeground(WHITE, BODY, { ink: GRAY })).toThrow(
       /gamut is undefined/,
     );
     expect(() =>

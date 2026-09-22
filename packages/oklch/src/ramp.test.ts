@@ -57,7 +57,7 @@ describe("inspectRamp", () => {
     expect(inGamut(step.fallback.color, "srgb")).toBe(true);
   });
 
-  it("measures the gaps between neighbours and where the spacing bunches", () => {
+  it("measures the gaps between neighbors and where the spacing bunches", () => {
     const report = inspectRamp(BLUES, "srgb");
     expect(report.gaps).toHaveLength(BLUES.length - 1);
     report.gaps.forEach((gap, i) => {

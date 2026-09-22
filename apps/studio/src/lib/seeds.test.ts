@@ -1,4 +1,4 @@
-import { auditOf, newBrand } from "@jamiethompson/oklch-brand";
+import { auditOf, newBrand } from "@/lib/brand.ts";
 import { describe, expect, it } from "vitest";
 
 import { SEEDS } from "./seeds.ts";

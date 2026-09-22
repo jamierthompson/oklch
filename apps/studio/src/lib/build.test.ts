@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { newBrand, withOverride } from "./brand.js";
-import { buildBrand, describeFailures, slug } from "./build.js";
+import { newBrand, withOverride } from "./brand.ts";
+import { buildBrand, describeFailures, slug } from "./build.ts";
 
 const acme = () => newBrand("Acme Corp", "#2563eb", "srgb");
 
@@ -35,10 +35,7 @@ describe("buildBrand", () => {
   });
 
   it("ships nothing while a token fails, and says which", () => {
-    const failing = withOverride(acme(), "light", "primary", {
-      ramp: "brand",
-      step: 1,
-    });
+    const failing = withOverride(acme(), "light", "primary", { step: 1 });
     const built = buildBrand(failing);
     expect(built.outputs).toBeNull();
     const lines = describeFailures(built.audit);

@@ -3,7 +3,7 @@ import { deltaE } from "colorjs.io/fn";
 import { assertColor, toColorjs, type OkLCH } from "./color.js";
 
 /**
- * How far is this step from its neighbour?
+ * How far is this step from its neighbor?
  *
  * Perceived difference: Euclidean distance in OKLab, which is what OKLab was
  * fit so that distance would mean. One just-noticeable difference is 0.02.

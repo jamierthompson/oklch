@@ -76,9 +76,13 @@ export interface ShadcnAssignment {
   readonly secondary?: string;
   /** Hover and selection surfaces. Default: `neutral`. */
   readonly accent?: string;
+  /** The sidebar's surface and border. Default: `neutral`. */
+  readonly sidebar?: string;
+  /** Focus rings, solved on their surface. Default: `neutral`. */
+  readonly ring?: string;
   /**
-   * The five chart series, per scheme. Default: five steps of `primary`,
-   * spread across the ramp.
+   * The five chart series, per scheme. Default: `SHADCN_CHART_STEPS` of
+   * `primary`.
    */
   readonly charts?: {
     readonly light: readonly [StepRef, StepRef, StepRef, StepRef, StepRef];
@@ -93,6 +97,16 @@ export interface ShadcnBindings {
 
 /** The number of steps the preset picks by. */
 export const SHADCN_RAMP_STEPS = 11;
+
+/**
+ * The steps the five chart series pick by default, per scheme: spread
+ * across a ramp, the strongest first, so a series of one ramp still reads
+ * as five.
+ */
+export const SHADCN_CHART_STEPS = {
+  light: [6, 4, 8, 2, 10],
+  dark: [4, 6, 2, 8, 0],
+} as const;
 
 const { bodyText, interfaceElement } = CONTRAST_TARGETS;
 
@@ -109,9 +123,10 @@ const { bodyText, interfaceElement } = CONTRAST_TARGETS;
  * sits where shadcn's own does, near-black in light and near-white in
  * dark, so body text on it has room. `ring` is solved on its surface for
  * the same bar, from the near end: the quietest gray that still reads as
- * a focus ring. `border`, `input`, `sidebar-border`, and the chart series
- * carry no target: shadcn's own borders sit below 3:1 by design, and a
- * chart's series contrast with each other, not the page.
+ * a focus ring, on the `ring` ramp. `sidebar` and `sidebar-border` are
+ * surfaces of the `sidebar` ramp. `border`, `input`, `sidebar-border`, and
+ * the chart series carry no target: shadcn's own borders sit below 3:1 by
+ * design, and a chart's series contrast with each other, not the page.
  *
  * Nothing here is measured. The bindings go to `auditTokenSet` for a
  * verdict per token, or to `buildTokenSet` for a set or a refusal. Throws
@@ -127,6 +142,8 @@ export function shadcnBindings(
   const destructive = assignment.destructive;
   const secondary = assignment.secondary ?? neutral;
   const accent = assignment.accent ?? neutral;
+  const sidebar = assignment.sidebar ?? neutral;
+  const ring = assignment.ring ?? neutral;
 
   for (const [role, name] of Object.entries({
     neutral,
@@ -134,6 +151,8 @@ export function shadcnBindings(
     destructive,
     secondary,
     accent,
+    sidebar,
+    ring,
   })) {
     const ramp = ramps.find((r) => r.name === name);
     if (ramp === undefined) {
@@ -147,21 +166,11 @@ export function shadcnBindings(
       );
     }
   }
+  const series = (s: Scheme): StepRef[] =>
+    SHADCN_CHART_STEPS[s].map((step) => ({ ramp: primary, step }));
   const charts = assignment.charts ?? {
-    light: [
-      { ramp: primary, step: 6 },
-      { ramp: primary, step: 4 },
-      { ramp: primary, step: 8 },
-      { ramp: primary, step: 2 },
-      { ramp: primary, step: 10 },
-    ],
-    dark: [
-      { ramp: primary, step: 4 },
-      { ramp: primary, step: 6 },
-      { ramp: primary, step: 2 },
-      { ramp: primary, step: 8 },
-      { ramp: primary, step: 0 },
-    ],
+    light: series("light"),
+    dark: series("dark"),
   };
 
   const scheme = (s: Scheme): Binding[] => {
@@ -194,7 +203,7 @@ export function shadcnBindings(
     ): Binding => ({ token, ramp, step, on, target: interfaceElement });
     const focus = (token: string, on: string): Binding => ({
       token,
-      ramp: neutral,
+      ramp: ring,
       on,
       target: interfaceElement,
       from: near,
@@ -220,13 +229,13 @@ export function shadcnBindings(
       surface("input", neutral, hairline),
       focus("ring", "background"),
       ...charts[s].map((c, i) => surface(`chart-${i + 1}`, c.ramp, c.step)),
-      surface("sidebar", neutral, light ? 1 : 9),
+      surface("sidebar", sidebar, light ? 1 : 9),
       ink("sidebar-foreground", "sidebar"),
       element("sidebar-primary", primary, brand, "sidebar"),
       ink("sidebar-primary-foreground", "sidebar-primary", near),
       surface("sidebar-accent", accent, light ? 2 : 8),
       ink("sidebar-accent-foreground", "sidebar-accent"),
-      surface("sidebar-border", neutral, hairline),
+      surface("sidebar-border", sidebar, hairline),
       focus("sidebar-ring", "sidebar"),
     ];
   };

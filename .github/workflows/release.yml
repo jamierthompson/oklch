@@ -26,6 +26,12 @@ jobs:
       - name: Verify the tag matches the package version
         run: |
           test "v$(node -p "require('./packages/oklch/package.json').version")" = "$GITHUB_REF_NAME"
+      # pnpm publish packs the tarball itself, applying the manifest's
+      # publishConfig overrides (npm publish would ship the workspace
+      # "exports" pointing at ./src/index.ts, which is not in "files"), then
+      # hands the tarball to the npm CLI on PATH for the upload. Trusted
+      # publishing needs npm >= 11.5.1, so upgrade the one bundled with Node.
       - run: npm install -g npm@latest
-      - run: npm publish
+      # The tag checkout is a detached HEAD, which pnpm's git checks reject.
+      - run: pnpm publish --no-git-checks
         working-directory: packages/oklch

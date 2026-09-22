@@ -198,7 +198,7 @@ describe("shadcnBindings", () => {
     ).toBe(true);
   });
 
-  it("clears for a light brand hue too, because the inks are solved rather than picked", () => {
+  it("clears for a light primary hue too, because the inks are solved rather than picked", () => {
     const amber = [
       ramp("gray", 80, 0.05, TAILWIND_STOPS.neutral),
       ramp("amber", 80, 0.9),

@@ -1,12 +1,17 @@
-import { SHADCN_TOKENS, TAILWIND_STOPS } from "@jamiethompson/oklch";
+import {
+  HARMONY_KINDS,
+  SHADCN_TOKENS,
+  TAILWIND_STOPS,
+} from "@jamiethompson/oklch";
 import { describe, expect, it } from "vitest";
 
 import {
   auditOf,
   bindingsOf,
   cssVarsOf,
-  newBrand,
+  newTheme,
   parse,
+  randomTheme,
   rampOf,
   rolesOf,
   serialize,
@@ -17,15 +22,15 @@ import {
   withRole,
   withSecondary,
   withStep,
-} from "./brand.ts";
+} from "./theme.ts";
 
-const acme = () => newBrand("Acme", "#2563eb", "srgb");
+const acme = () => newTheme("Acme", "#2563eb", "srgb");
 const names = (b: ReturnType<typeof acme>) => b.ramps.map((r) => r.name);
 const amber = { L: 0.7, C: 0.15, H: 70 };
 const rampNamed = (b: ReturnType<typeof acme>, name: string) =>
   b.ramps.find((r) => r.name === name)!;
 
-describe("newBrand", () => {
+describe("newTheme", () => {
   it("drafts a tinted neutral, the primary through the seed, a red, and the analogous harmonies", () => {
     const b = acme();
     expect(names(b)).toEqual([
@@ -60,7 +65,7 @@ describe("newBrand", () => {
   });
 
   it("refuses a seed that is not a color", () => {
-    expect(() => newBrand("x", "blue-ish", "srgb")).toThrow(/not a color/);
+    expect(() => newTheme("x", "blue-ish", "srgb")).toThrow(/not a color/);
   });
 });
 
@@ -87,7 +92,7 @@ describe("roles", () => {
     expect(rampOf(b, "chart-3")).toBe("harmony-1");
     const chosen = withRole(b, "chart-3", "harmony-2");
     expect(rampOf(chosen, "chart-3")).toBe("harmony-2");
-    // A choice naming a ramp the brand no longer has falls back to the default.
+    // A choice naming a ramp the theme no longer has falls back to the default.
     expect(rampOf(withHarmony(chosen, "complementary"), "chart-3")).toBe(
       "harmony-1",
     );
@@ -101,6 +106,32 @@ describe("roles", () => {
       expect(light.find((x) => x.token === token)!.ramp).toBe("primary");
     }
     expect(light.find((x) => x.token === "chart-2")!.ramp).toBe("harmony-1");
+  });
+});
+
+describe("the seed step", () => {
+  it("is the seed: moving it moves the seed, within the safe chroma, and nothing else redraws", () => {
+    const b = withSecondary(acme(), amber);
+    const seed = rampNamed(b, "primary").seed!;
+    const harmonyBefore = rampNamed(b, "harmony-1").steps;
+    const moved = withStep(b, "primary", seed, { L: 0.5, C: 0.9, H: 200 });
+    const step = rampNamed(moved, "primary").steps[seed]!;
+    expect(moved.primary).toEqual(step);
+    expect(step.H).toBe(200);
+    expect(step.C).toBeLessThan(0.9);
+    expect(rampNamed(moved, "harmony-1").steps).toBe(harmonyBefore);
+    // Other steps of the ramp, and the secondary's seed step, do the same.
+    const other = withStep(moved, "primary", seed + 1, {
+      L: 0.4,
+      C: 0.1,
+      H: 200,
+    });
+    expect(other.primary).toEqual(step);
+    const s2 = rampNamed(b, "secondary").seed!;
+    const sec = withStep(b, "secondary", s2, { L: 0.6, C: 0.1, H: 80 });
+    expect(sec.secondary).toEqual(rampNamed(sec, "secondary").steps[s2]);
+    // And a harmony change after the move still drafts, since the seed stayed safe.
+    expect(() => withHarmony(moved, "triadic")).not.toThrow();
   });
 });
 
@@ -152,7 +183,7 @@ describe("seeds", () => {
   });
 
   it("an achromatic primary builds the tint and the harmonies on the secondary's hue, or on nothing", () => {
-    const gray = newBrand("Gray", "#475569", "srgb");
+    const gray = newTheme("Gray", "#475569", "srgb");
     const flat = withPrimary(gray, { L: 0.4, C: 0.005, H: 0 });
     expect(names(flat)).toEqual(["primary", "neutral", "red"]);
     expect(rampNamed(flat, "neutral").steps[5]!.C).toBe(0);
@@ -222,6 +253,29 @@ describe("cssVarsOf", () => {
     expect(vars["--radius"]).toBe("0.5rem");
     expect(Object.keys(vars)).toHaveLength(SHADCN_TOKENS.length + 1);
     expect(vars["--background"]).toMatch(/^oklch\(0\.145 /);
+  });
+});
+
+describe("randomTheme", () => {
+  it("has a primary, a secondary, a harmony, and ramps drafted from them, and clears", () => {
+    let n = 0;
+    // A fixed sequence stands in for Math.random, so the test is the same every run.
+    const random = () => (n = (n * 9301 + 49297) % 233280) / 233280;
+    for (let i = 0; i < 10; i++) {
+      const t = randomTheme("Red Zone", random);
+      expect(t.name).toBe("Red Zone");
+      expect(t.secondary).not.toBeNull();
+      expect(names(t)).toContain("secondary");
+      expect(names(t).filter((r) => r.startsWith("harmony-")).length).toBe(
+        HARMONY_KINDS[t.harmony].length,
+      );
+      const audit = auditOf(t);
+      expect(
+        [...audit.light, ...audit.dark].filter(
+          (a) => a.outcome.kind !== "clears",
+        ),
+      ).toEqual([]);
+    }
   });
 });
 

@@ -13,27 +13,27 @@ import { Badge } from "@/components/ui/badge";
 import {
   rampOf,
   ROLES,
-  type Brand,
-  type BrandRamp,
+  type Theme,
+  type ThemeRamp,
   type Role,
-} from "@/lib/brand.ts";
+} from "@/lib/theme.ts";
 import { fixed, stopName } from "@/lib/format.ts";
 import { usedBy, type Usage } from "@/lib/usage.ts";
 
 /** How a token came to sit on this step. */
-function howOf(brand: Brand, a: TokenAudit): "override" | "solved" | "picked" {
-  if (brand.overrides[a.scheme][a.token] !== undefined) return "override";
+function howOf(theme: Theme, a: TokenAudit): "override" | "solved" | "picked" {
+  if (theme.overrides[a.scheme][a.token] !== undefined) return "override";
   return a.outcome.kind !== "unresolved" && a.outcome.resolved.how === "solved"
     ? "solved"
     : "picked";
 }
 
 /** What drew this ramp: the seed's hue, or the offset from it. */
-function subtitleOf(brand: Brand, ramp: BrandRamp): string {
+function subtitleOf(theme: Theme, ramp: ThemeRamp): string {
   const hue = `H ${fixed(ramp.steps[5]?.H ?? 0, 1)}°`;
   const n = ramp.name.match(/^harmony-(\d+)$/);
   if (n === null) return hue;
-  const offset = HARMONY_KINDS[brand.harmony][Number(n[1]) - 1] ?? 0;
+  const offset = HARMONY_KINDS[theme.harmony][Number(n[1]) - 1] ?? 0;
   return `${offset > 0 ? "+" : ""}${offset}° → ${hue}`;
 }
 
@@ -45,7 +45,7 @@ function subtitleOf(brand: Brand, ramp: BrandRamp): string {
  * move the selected step; the seeds in the rail redraw the ramp.
  */
 export function RampEditor({
-  brand,
+  theme,
   ramp,
   usage,
   selected,
@@ -54,8 +54,8 @@ export function RampEditor({
   onRole,
   onStep,
 }: {
-  brand: Brand;
-  ramp: BrandRamp;
+  theme: Theme;
+  ramp: ThemeRamp;
   usage: Usage;
   /** The selected step, when the selection is on this ramp. */
   selected: number | null;
@@ -66,8 +66,8 @@ export function RampEditor({
   onStep: (index: number, step: OkLCH) => void;
 }) {
   const report = useMemo(
-    () => inspectRamp(ramp.steps, brand.gamut),
-    [ramp.steps, brand.gamut],
+    () => inspectRamp(ramp.steps, theme.gamut),
+    [ramp.steps, theme.gamut],
   );
   const onStepTokens = (i: number) =>
     usedBy(usage, { ramp: ramp.name, step: i });
@@ -81,7 +81,7 @@ export function RampEditor({
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-medium">{ramp.name}</h3>
         <span className="font-mono text-xs text-muted-foreground">
-          {subtitleOf(brand, ramp)}
+          {subtitleOf(theme, ramp)}
         </span>
         <div
           className="flex flex-wrap gap-1"
@@ -89,7 +89,7 @@ export function RampEditor({
           aria-label={`${ramp.name} roles`}
         >
           {ROLES.map((role) => {
-            const plays = rampOf(brand, role) === ramp.name;
+            const plays = rampOf(theme, role) === ramp.name;
             return (
               <Badge
                 key={role}
@@ -177,7 +177,7 @@ export function RampEditor({
 
       {selected !== null && ramp.steps[selected] !== undefined && (
         <StepDetail
-          brand={brand}
+          theme={theme}
           ramp={ramp}
           index={selected}
           step={ramp.steps[selected]}
@@ -193,7 +193,7 @@ export function RampEditor({
 
 /** The selected step: what it measures, the sliders that move it, and the tokens that land on it. */
 function StepDetail({
-  brand,
+  theme,
   ramp,
   index,
   step,
@@ -202,8 +202,8 @@ function StepDetail({
   onShowToken,
   onStep,
 }: {
-  brand: Brand;
-  ramp: BrandRamp;
+  theme: Theme;
+  ramp: ThemeRamp;
   index: number;
   step: OkLCH;
   inspected: ReturnType<typeof inspectRamp>["steps"][number];
@@ -215,10 +215,10 @@ function StepDetail({
     <div className="grid gap-2" aria-label={`${ramp.name} ${stopName(index)}`}>
       <div className="text-xs text-muted-foreground">
         step {stopName(index)} · chroma {fixed(inspected.chromaShare * 100, 0)}%
-        of what {brand.gamut} allows
+        of what {theme.gamut} allows
         {inspected.onCusp ? " · on the cusp" : ""}
         {inspected.map.moved
-          ? ` · mapped into ${brand.gamut}, ΔE ${fixed(inspected.map.deltaEOK)}`
+          ? ` · mapped into ${theme.gamut}, ΔE ${fixed(inspected.map.deltaEOK)}`
           : ""}
       </div>
       <Field
@@ -265,7 +265,7 @@ function StepDetail({
             >
               {a.scheme} · {a.token}
             </button>
-            <span className="text-muted-foreground">{howOf(brand, a)}</span>
+            <span className="text-muted-foreground">{howOf(theme, a)}</span>
             <Verdict a={a} />
           </div>
         ))}

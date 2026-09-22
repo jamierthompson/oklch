@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cssVarsOf, type Brand, type Scheme } from "@/lib/brand.ts";
+import { cssVarsOf, type Theme, type Scheme } from "@/lib/theme.ts";
 
 /** Static class names, so Tailwind emits them. */
 const CHART = [
@@ -32,15 +32,15 @@ const CHART = [
  * sets every token inline, so what fails is visible, not hidden.
  */
 export function Preview({
-  brand,
+  theme,
   audit,
   scheme,
 }: {
-  brand: Brand;
+  theme: Theme;
   audit: TokenSetAudit;
   scheme: Scheme;
 }) {
-  const style = cssVarsOf(audit, scheme, brand.radius) as CSSProperties;
+  const style = cssVarsOf(audit, scheme, theme.radius) as CSSProperties;
   return (
     <div
       className={scheme === "dark" ? "dark" : ""}
@@ -50,7 +50,7 @@ export function Preview({
       <div className="grid grid-cols-[9rem_1fr] rounded-lg border border-border bg-background text-foreground">
         <aside className="grid content-start gap-1 rounded-l-lg border-r border-sidebar-border bg-sidebar p-3 text-sidebar-foreground">
           <div className="mb-2 text-xs font-semibold uppercase text-sidebar-foreground/70">
-            {brand.name}
+            {theme.name}
           </div>
           <div className="rounded-md bg-sidebar-primary px-2 py-1 text-sm text-sidebar-primary-foreground">
             Overview

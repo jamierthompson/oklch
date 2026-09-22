@@ -1,9 +1,9 @@
-import { auditOf, newBrand, withOverride } from "@/lib/brand.ts";
+import { auditOf, newTheme, withOverride } from "@/lib/theme.ts";
 import { describe, expect, it } from "vitest";
 
 import { landedOn, usageOf, usedBy } from "./usage.ts";
 
-const acme = () => newBrand("Acme", "#2563eb", "srgb");
+const acme = () => newTheme("Acme", "#2563eb", "srgb");
 
 describe("usageOf", () => {
   it("maps each step to the tokens that landed on it, picked or solved", () => {
@@ -24,8 +24,8 @@ describe("usageOf", () => {
   it("skips a token with no color, and reports where a solve landed", () => {
     // A red step 0 on background does not clear, so every ink on it stays unresolved? No:
     // a failing pick keeps its color. Only a solve with no clearing step is unresolved.
-    const brand = withOverride(acme(), "light", "foreground", { step: 1 });
-    const audit = auditOf(brand);
+    const theme = withOverride(acme(), "light", "foreground", { step: 1 });
+    const audit = auditOf(theme);
     const foreground = audit.light.find((a) => a.token === "foreground")!;
     expect(foreground.outcome.kind).toBe("fails");
     expect(landedOn(foreground)).toEqual({ ramp: "neutral", step: 1 });

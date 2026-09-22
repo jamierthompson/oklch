@@ -24,10 +24,10 @@ import {
   colorOf,
   fromOf,
   snapTo,
-  withOverride,
-  type Brand,
+  type Theme,
+  type Override,
   type Scheme,
-} from "@/lib/brand.ts";
+} from "@/lib/theme.ts";
 import { STOP_NAMES } from "@/lib/format.ts";
 import { landedOn, stepKey, type StepRef } from "@/lib/usage.ts";
 
@@ -37,21 +37,25 @@ export function tokenCellId(scheme: Scheme, token: string): string {
 }
 
 function Cell({
-  brand,
+  theme,
   audit,
   scheme,
   token,
   selection,
   onLocate,
-  onUpdate,
+  onOverride,
 }: {
-  brand: Brand;
+  theme: Theme;
   audit: TokenSetAudit;
   scheme: Scheme;
   token: string;
   selection: StepRef | null;
   onLocate: (ref: StepRef) => void;
-  onUpdate: (b: Brand) => void;
+  onOverride: (
+    scheme: Scheme,
+    token: string,
+    override: Override | null,
+  ) => void;
 }) {
   const [note, setNote] = useState<string | null>(null);
   const a = audit[scheme].find((x) => x.token === token)!;
@@ -60,7 +64,7 @@ function Cell({
     binding.on === undefined
       ? null
       : colorOf(audit[scheme].find((x) => x.token === binding.on)!.outcome);
-  const override = brand.overrides[scheme][token];
+  const override = theme.overrides[scheme][token];
   const solved = binding.step === undefined;
   const stepValue = solved ? "solve" : String(binding.step);
   const landed = landedOn(a);
@@ -72,18 +76,15 @@ function Cell({
     ...Object.fromEntries(STOP_NAMES.map((n, i) => [String(i), n])),
     ...(binding.on === undefined
       ? {}
-      : { solve: `solve from ${fromOf(brand, scheme, token)}` }),
+      : { solve: `solve from ${fromOf(theme, scheme, token)}` }),
   };
   const setStep = (v: string) =>
-    onUpdate(
-      withOverride(
-        brand,
-        scheme,
-        token,
-        v === "solve"
-          ? { solve: true, from: fromOf(brand, scheme, token) }
-          : { step: Number(v) },
-      ),
+    onOverride(
+      scheme,
+      token,
+      v === "solve"
+        ? { solve: true, from: fromOf(theme, scheme, token) }
+        : { step: Number(v) },
     );
   const stepLabel = solved
     ? `solved → ${landed === null ? "—" : STOP_NAMES[landed.step]}`
@@ -138,7 +139,7 @@ function Cell({
             ))}
             {binding.on !== undefined && (
               <SelectItem value="solve">
-                solve from {fromOf(brand, scheme, token)}
+                solve from {fromOf(theme, scheme, token)}
               </SelectItem>
             )}
           </SelectContent>
@@ -149,14 +150,14 @@ function Cell({
             size="sm"
             variant="outline"
             onClick={() => {
-              const snapped = snapTo(brand, scheme, token);
+              const snapped = snapTo(theme, scheme, token);
               if (snapped === null) {
                 setNote(
                   `no step of ${binding.ramp} clears on ${binding.on}; move ${binding.on}, or give its role another ramp`,
                 );
               } else {
                 setNote(null);
-                onUpdate(withOverride(brand, scheme, token, snapped));
+                onOverride(scheme, token, snapped);
               }
             }}
           >
@@ -170,7 +171,7 @@ function Cell({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => onUpdate(withOverride(brand, scheme, token, null))}
+            onClick={() => onOverride(scheme, token, null)}
           >
             Reset
           </Button>
@@ -187,18 +188,22 @@ function Cell({
  * selected step are highlighted.
  */
 export function TokensPanel({
-  brand,
+  theme,
   audit,
   selection = null,
   onLocate = () => {},
-  onUpdate,
+  onOverride,
 }: {
-  brand: Brand;
+  theme: Theme;
   audit: TokenSetAudit;
   /** The step selected on the ramps, if any. */
   selection?: StepRef | null;
   onLocate?: (ref: StepRef) => void;
-  onUpdate: (b: Brand) => void;
+  onOverride: (
+    scheme: Scheme,
+    token: string,
+    override: Override | null,
+  ) => void;
 }) {
   return (
     <Table>
@@ -218,13 +223,13 @@ export function TokensPanel({
             {(["light", "dark"] as const).map((scheme) => (
               <Cell
                 key={scheme}
-                brand={brand}
+                theme={theme}
                 audit={audit}
                 scheme={scheme}
                 token={token}
                 selection={selection}
                 onLocate={onLocate}
-                onUpdate={onUpdate}
+                onOverride={onOverride}
               />
             ))}
           </TableRow>

@@ -1,10 +1,10 @@
-import type { TokenAudit, TokenSetAudit } from "@jamiethompson/oklch";
+import type { OkLCH, TokenAudit, TokenSetAudit } from "@jamiethompson/oklch";
 import { useMemo, useState } from "react";
 
 import { Preview } from "@/components/Preview.tsx";
 import { RampEditor } from "@/components/RampEditor.tsx";
 import { tokenCellId, TokensPanel } from "@/components/TokensPanel.tsx";
-import { withRole, withStep, type Brand } from "@/lib/brand.ts";
+import type { Theme, Override, Role, Scheme } from "@/lib/theme.ts";
 import { usageOf, type StepRef } from "@/lib/usage.ts";
 
 /** The step selected when nothing has been: the primary's seed step, else its middle. */
@@ -43,22 +43,32 @@ function Section({
  * locates the step it came from. Roles are given on the ramp that plays
  * them, and a token's ramp is its role's: the eye moves steps, not ramps.
  */
+export interface PaletteActions {
+  onStep: (ramp: string, index: number, step: OkLCH) => void;
+  onRole: (role: Role, ramp: string) => void;
+  onOverride: (
+    scheme: Scheme,
+    token: string,
+    override: Override | null,
+  ) => void;
+}
+
 export function PalettePanel({
-  brand,
+  theme,
   audit,
-  onUpdate,
+  actions,
 }: {
-  brand: Brand;
+  theme: Theme;
   audit: TokenSetAudit;
-  onUpdate: (b: Brand) => void;
+  actions: PaletteActions;
 }) {
   const [selected, setSelected] = useState<StepRef | null>(null);
   const usage = useMemo(() => usageOf(audit), [audit]);
 
-  // A selection that names a ramp the brand no longer has falls back.
-  const primary = brand.ramps.find((r) => r.name === "primary");
+  // A selection that names a ramp the theme no longer has falls back.
+  const primary = theme.ramps.find((r) => r.name === "primary");
   const selection: StepRef | null =
-    selected !== null && brand.ramps.some((r) => r.name === selected.ramp)
+    selected !== null && theme.ramps.some((r) => r.name === selected.ramp)
       ? selected
       : primary === undefined
         ? null
@@ -84,17 +94,17 @@ export function PalettePanel({
           </p>
         }
       >
-        {brand.ramps.map((ramp) => (
+        {theme.ramps.map((ramp) => (
           <RampEditor
             key={ramp.name}
-            brand={brand}
+            theme={theme}
             ramp={ramp}
             usage={usage}
             selected={selection?.ramp === ramp.name ? selection.step : null}
             onSelect={(step) => setSelected({ ramp: ramp.name, step })}
             onShowToken={showToken}
-            onRole={(role) => onUpdate(withRole(brand, role, ramp.name))}
-            onStep={(i, s) => onUpdate(withStep(brand, ramp.name, i, s))}
+            onRole={(role) => actions.onRole(role, ramp.name)}
+            onStep={(i, s) => actions.onStep(ramp.name, i, s)}
           />
         ))}
       </Section>
@@ -109,8 +119,8 @@ export function PalettePanel({
         }
       >
         <div className="grid gap-4 2xl:grid-cols-2">
-          <Preview brand={brand} audit={audit} scheme="light" />
-          <Preview brand={brand} audit={audit} scheme="dark" />
+          <Preview theme={theme} audit={audit} scheme="light" />
+          <Preview theme={theme} audit={audit} scheme="dark" />
         </div>
       </Section>
 
@@ -126,11 +136,11 @@ export function PalettePanel({
         }
       >
         <TokensPanel
-          brand={brand}
+          theme={theme}
           audit={audit}
           selection={selection}
           onLocate={locate}
-          onUpdate={onUpdate}
+          onOverride={actions.onOverride}
         />
       </Section>
     </div>

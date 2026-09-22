@@ -56,7 +56,7 @@ export interface RampFromHue extends RampBase {
   readonly through?: undefined;
 }
 
-/** A ramp drawn through a brand color: its hue, its share of the gamut, and one step placed on it exactly. */
+/** A ramp drawn through a seed color: its hue, its share of the gamut, and one step placed on it exactly. */
 export interface RampThrough extends RampBase {
   readonly through: OkLCH;
   readonly hue?: undefined;
@@ -74,7 +74,7 @@ export interface GeneratedRamp {
   readonly saturation: number;
   /** The lightness stops actually used, with the `through` step's lightness substituted where it landed. */
   readonly lightness: readonly number[];
-  /** The step placed on the brand color, or null when the ramp was drawn from a hue. */
+  /** The step placed on the seed color, or null when the ramp was drawn from a hue. */
   readonly through: { readonly index: number; readonly color: OkLCH } | null;
   readonly gamut: Gamut;
 }
@@ -117,10 +117,10 @@ function assertLightness(fn: string, stops: readonly number[]): void {
  * quiet at the ends by construction, and every step is inside the gamut.
  * `hueShift` drifts the hue linearly across the ramp, from the anchor.
  *
- * With `through`, the ramp is drawn through a brand color instead: its hue
+ * With `through`, the ramp is drawn through a seed color instead: its hue
  * is the ramp's, its chroma as a share of the safe prefix at its lightness
  * is the ramp's saturation, and the stop nearest its lightness is replaced
- * by that lightness, so the brand color is a step, exactly. A brand color
+ * by that lightness, so the seed color is a step, exactly. A seed color
  * beyond the safe prefix is refused by name rather than desaturated: map
  * it first, or draw the ramp for the gamut it fits.
  *

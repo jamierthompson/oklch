@@ -1,7 +1,6 @@
 import {
   formatHex,
   formatOklch,
-  maxChroma,
   parseColor,
   type OkLCH,
 } from "@jamiethompson/oklch";
@@ -14,27 +13,16 @@ import { Input } from "@/components/ui/input";
 import {
   hueSourceOf,
   isChromatic,
-  withHarmony,
-  withPrimary,
-  withSecondary,
-  type Brand,
-} from "@/lib/brand.ts";
+  safeSeed,
+  SEED_L,
+  type Theme,
+  type HarmonyKind,
+} from "@/lib/theme.ts";
 
-/** The lightness a seed can be dragged to: a hue survives at neither end. */
-const L_MIN = 0.05;
-const L_MAX = 0.95;
+const L_MIN = SEED_L.min;
+const L_MAX = SEED_L.max;
 /** Below this many degrees apart, two seeds read as tints of one hue. */
 const CLOSE_HUES = 20;
-
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, v));
-
-/** A seed within the gamut's safe chroma at its lightness, so a ramp can be drawn through it. */
-function safe(c: OkLCH, gamut: Brand["gamut"]): OkLCH {
-  const L = clamp(c.L, L_MIN, L_MAX);
-  const H = ((c.H % 360) + 360) % 360;
-  return { L, C: clamp(c.C, 0, maxChroma(L, H, gamut)), H };
-}
 
 function Group({
   title,
@@ -66,7 +54,7 @@ function SeedEditor({
 }: {
   label: string;
   color: OkLCH;
-  gamut: Brand["gamut"];
+  gamut: Theme["gamut"];
   onChange: (c: OkLCH) => string | null;
 }) {
   const hex = formatHex(color).hex;
@@ -82,7 +70,7 @@ function SeedEditor({
     }
     setError(onChange(parsed));
   };
-  const move = (next: OkLCH) => setError(onChange(safe(next, gamut)));
+  const move = (next: OkLCH) => setError(onChange(safeSeed(next, gamut)));
 
   return (
     <div className="grid gap-2">
@@ -132,9 +120,9 @@ function SeedEditor({
 }
 
 /** What the seeds imply that the eye should know. */
-function notesOf(brand: Brand): string[] {
+function notesOf(theme: Theme): string[] {
   const notes: string[] = [];
-  const { primary, secondary } = brand;
+  const { primary, secondary } = theme;
   if (!isChromatic(primary)) {
     notes.push(
       secondary !== null && isChromatic(secondary)
@@ -144,7 +132,7 @@ function notesOf(brand: Brand): string[] {
   }
   if (secondary !== null && !isChromatic(secondary)) {
     notes.push(
-      "The secondary has no hue: its ramp is a true gray, so secondary surfaces read as neutral. Faithful to the brand, not a bug.",
+      "The secondary has no hue: its ramp is a true gray, so secondary surfaces read as neutral. Faithful to the theme, not a bug.",
     );
   }
   if (secondary !== null && isChromatic(primary) && isChromatic(secondary)) {
@@ -158,56 +146,77 @@ function notesOf(brand: Brand): string[] {
   return notes;
 }
 
+/** The primary ramp as it stands, live, so a seed can be dragged with its effect in view even from a drawer. */
+function Strip({ theme }: { theme: Theme }) {
+  const primary = theme.ramps.find((r) => r.name === "primary");
+  if (primary === undefined) return null;
+  return (
+    <div
+      className="flex gap-px overflow-hidden rounded-md border"
+      aria-label="primary ramp"
+      role="img"
+    >
+      {primary.steps.map((s, i) => (
+        <span
+          key={i}
+          className="h-4 flex-1"
+          style={{ background: formatOklch(s) }}
+        />
+      ))}
+    </div>
+  );
+}
+
 /**
  * The rail: the two seeds and the harmony the ramps are drafted from.
  * Every change here redraws the ramps it touches and leaves the eye's
  * steps on the others; the ramps themselves are edited in the palette.
+ * Each callback answers with a message when the change is refused.
  */
 export function SeedRail({
-  brand,
-  onUpdate,
+  theme,
+  onPrimary,
+  onSecondary,
+  onHarmony,
   className = "",
 }: {
-  brand: Brand;
-  onUpdate: (b: Brand) => void;
+  theme: Theme;
+  onPrimary: (c: OkLCH) => string | null;
+  onSecondary: (c: OkLCH | null) => string | null;
+  onHarmony: (k: HarmonyKind) => string | null;
   className?: string;
 }) {
   const [secondaryText, setSecondaryText] = useState("");
   const [secondaryError, setSecondaryError] = useState<string | null>(null);
-  const attempt = (f: () => Brand): string | null => {
-    try {
-      onUpdate(f());
-      return null;
-    } catch (e) {
-      return e instanceof Error ? e.message : String(e);
-    }
-  };
   const addSecondary = () => {
     const parsed = parseColor(secondaryText.trim());
     if (parsed === null) {
       setSecondaryError(`"${secondaryText.trim()}" is not a color`);
       return;
     }
-    const error = attempt(() => withSecondary(brand, parsed));
+    const error = onSecondary(parsed);
     setSecondaryError(error);
     if (error === null) setSecondaryText("");
   };
-  const source = hueSourceOf(brand.primary, brand.secondary);
-  const notes = notesOf(brand);
+  const source = hueSourceOf(theme.primary, theme.secondary);
+  const notes = notesOf(theme);
 
   return (
     <aside className={`grid content-start ${className}`} aria-label="Seeds">
+      <div className="pt-3">
+        <Strip theme={theme} />
+      </div>
       <Group title="Primary seed">
         <SeedEditor
           label="Primary"
-          color={brand.primary}
-          gamut={brand.gamut}
-          onChange={(c) => attempt(() => withPrimary(brand, c))}
+          color={theme.primary}
+          gamut={theme.gamut}
+          onChange={onPrimary}
         />
       </Group>
 
       <Group title="Secondary seed">
-        {brand.secondary === null ? (
+        {theme.secondary === null ? (
           <div className="grid gap-2">
             <div className="flex gap-2">
               <Input
@@ -238,15 +247,15 @@ export function SeedRail({
           <>
             <SeedEditor
               label="Secondary"
-              color={brand.secondary}
-              gamut={brand.gamut}
-              onChange={(c) => attempt(() => withSecondary(brand, c))}
+              color={theme.secondary}
+              gamut={theme.gamut}
+              onChange={onSecondary}
             />
             <Button
               size="sm"
               variant="ghost"
               className="justify-self-start"
-              onClick={() => attempt(() => withSecondary(brand, null))}
+              onClick={() => onSecondary(null)}
             >
               Remove secondary
             </Button>
@@ -256,15 +265,15 @@ export function SeedRail({
 
       <Group
         title={
-          source === brand.primary || source === null
+          source === theme.primary || source === null
             ? "Harmony of the primary hue"
             : "Harmony of the secondary hue"
         }
       >
         <HarmonyPicker
-          value={brand.harmony}
+          value={theme.harmony}
           hue={source?.H ?? null}
-          onChange={(kind) => attempt(() => withHarmony(brand, kind))}
+          onChange={(kind) => onHarmony(kind)}
         />
       </Group>
 

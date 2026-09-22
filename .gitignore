@@ -7,3 +7,6 @@ coverage/
 !.env.example
 test-results/
 playwright-report/
+
+# Vercel project link
+.vercel

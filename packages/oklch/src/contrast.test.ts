@@ -52,9 +52,9 @@ describe("contrastAPCA", () => {
   });
 
   it("distinguishes the two polarities WCAG scores identically", () => {
-    const grey = { L: 0.6, C: 0, H: 0 };
-    expect(Math.abs(contrastAPCA(grey, WHITE))).not.toBeCloseTo(
-      Math.abs(contrastAPCA(WHITE, grey)),
+    const gray = { L: 0.6, C: 0, H: 0 };
+    expect(Math.abs(contrastAPCA(gray, WHITE))).not.toBeCloseTo(
+      Math.abs(contrastAPCA(WHITE, gray)),
       0,
     );
   });
@@ -102,11 +102,11 @@ describe("checkContrast", () => {
   });
 
   it("requires both standards, not either", () => {
-    // White on a mid grey: WCAG clears its floor and APCA does not. The two
+    // White on a mid gray: WCAG clears its floor and APCA does not. The two
     // standards disagree by about 2x at the same bar, and clearing one is not
     // clearing.
-    const grey = { L: 0.6, C: 0, H: 0 };
-    const check = checkContrast(WHITE, grey, { wcag: 3, apca: 75 });
+    const gray = { L: 0.6, C: 0, H: 0 };
+    const check = checkContrast(WHITE, gray, { wcag: 3, apca: 75 });
     expect(check.wcag.passes).not.toBe(check.apca.passes);
     expect(check.passes).toBe(false);
   });

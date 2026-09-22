@@ -31,7 +31,7 @@ describe("rotateHue", () => {
 });
 
 describe("harmony", () => {
-  it("speaks colour-theory vocabulary", () => {
+  it("speaks color-theory vocabulary", () => {
     expect(Object.keys(HARMONY_KINDS)).toEqual([
       "complementary",
       "analogous",

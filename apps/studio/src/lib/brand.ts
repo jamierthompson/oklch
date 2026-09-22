@@ -99,7 +99,7 @@ export const HARMONY_LABELS: Record<
   analogous: {
     name: "Analogous",
     description:
-      "The neighbours on the wheel. One family of hue: calm, and the accents stay close to the brand.",
+      "The neighbors on the wheel. One family of hue: calm, and the accents stay close to the brand.",
   },
   complementary: {
     name: "Complementary",
@@ -109,7 +109,7 @@ export const HARMONY_LABELS: Record<
   "split-complementary": {
     name: "Split-complementary",
     description:
-      "The opposite hue's neighbours. Contrast without the tension of a direct opposite.",
+      "The opposite hue's neighbors. Contrast without the tension of a direct opposite.",
   },
   triadic: {
     name: "Triadic",

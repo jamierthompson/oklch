@@ -100,7 +100,7 @@ describe("SeedRail", () => {
   it("describes the chosen harmony, with its offsets", () => {
     rail(acme());
     expect(screen.getByText("-30°, +30°")).toBeInTheDocument();
-    expect(screen.getByText(/The neighbours on the wheel/)).toBeInTheDocument();
+    expect(screen.getByText(/The neighbors on the wheel/)).toBeInTheDocument();
     cleanup();
     rail(withHarmony(acme(), "tetradic"));
     expect(screen.getByText("+90°, +180°, +270°")).toBeInTheDocument();

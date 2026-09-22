@@ -72,7 +72,7 @@ const BISECT_STEPS = 32;
  * not convex in OkLCH: near sRGB blue it re-enters, so the vertex #0000ff
  * sits displayable beyond a band of chroma that is not. A plain bisection
  * can land on the far side of such a gap and report a "maximum" the prefix
- * below it does not honour. This function sweeps upward in fixed steps to
+ * below it does not honor. This function sweeps upward in fixed steps to
  * find the first crossing, then bisects inside that step — so the answer is
  * always the near edge. The sweep resolution is 1/128 of the gamut's chroma
  * ceiling; a re-entry narrower than that would be stepped over, and none is

@@ -1,7 +1,7 @@
 /**
  * Tier 2: a list of steps. Nothing here is generated — the steps are the
  * OkLCH colors an eye placed, and these functions say what each one
- * measures and how the neighbours relate. Built from Tier 1 alone.
+ * measures and how the neighbors relate. Built from Tier 1 alone.
  */
 
 import {
@@ -43,7 +43,7 @@ export interface RampStep {
   };
 }
 
-/** The relation between two neighbouring steps, measured on what ships. */
+/** The relation between two neighboring steps, measured on what ships. */
 export interface RampGap {
   readonly from: number;
   readonly to: number;
@@ -59,11 +59,11 @@ export type LightnessDirection = "increasing" | "decreasing" | "flat" | "mixed";
 export interface RampReport {
   readonly gamut: Gamut;
   readonly steps: readonly RampStep[];
-  /** One gap per neighbouring pair; empty for a single step. */
+  /** One gap per neighboring pair; empty for a single step. */
   readonly gaps: readonly RampGap[];
   readonly lightness: { readonly direction: LightnessDirection };
   readonly spacing: {
-    /** Mean ΔEOK between neighbours; 0 for a single step. */
+    /** Mean ΔEOK between neighbors; 0 for a single step. */
     readonly mean: number;
     /** Index into `gaps` of the tightest and widest gap, or null for a single step. */
     readonly tightest: number | null;
@@ -76,12 +76,12 @@ const BLACK: OkLCH = { L: 0, C: 0, H: 0 };
 const CUSP_TOLERANCE = 0.001;
 
 /**
- * What does each step I placed measure, and how do the neighbours relate?
+ * What does each step I placed measure, and how do the neighbors relate?
  *
  * Per step: the map into the gamut and what it moved, the sRGB fallback,
  * chroma as a share of what the gamut allows there, whether it sits on the
  * boundary, and both contrast meters against white and black. Between
- * steps, the one thing Tier 1 cannot see: ΔEOK to each neighbour, whether
+ * steps, the one thing Tier 1 cannot see: ΔEOK to each neighbor, whether
  * lightness runs one way, and where the spacing bunches.
  *
  * Steps carry L, C and H each; a hue that drifts across a ramp is a choice

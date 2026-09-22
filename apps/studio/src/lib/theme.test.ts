@@ -104,6 +104,31 @@ describe("roles", () => {
   });
 });
 
+describe("the seed step", () => {
+  it("is the seed: moving it moves the seed, within the safe chroma, and nothing else redraws", () => {
+    const b = withSecondary(acme(), amber);
+    const seed = rampNamed(b, "primary").seed!;
+    const harmonyBefore = rampNamed(b, "harmony-1").steps;
+    const moved = withStep(b, "primary", seed, { L: 0.5, C: 0.9, H: 200 });
+    const step = rampNamed(moved, "primary").steps[seed]!;
+    expect(moved.primary).toEqual(step);
+    expect(step.H).toBe(200);
+    expect(step.C).toBeLessThan(0.9);
+    expect(rampNamed(moved, "harmony-1").steps).toBe(harmonyBefore);
+    // Other steps of the ramp, and the secondary's seed step, do the same.
+    const other = withStep(moved, "primary", seed + 1, {
+      L: 0.4,
+      C: 0.1,
+      H: 200,
+    });
+    expect(other.primary).toEqual(step);
+    const s2 = rampNamed(b, "secondary").seed!;
+    const sec = withStep(b, "secondary", s2, { L: 0.6, C: 0.1, H: 80 });
+    expect(sec.secondary).toEqual(rampNamed(sec, "secondary").steps[s2]);
+    // And a harmony change after the move still drafts, since the seed stayed safe.
+    expect(() => withHarmony(moved, "triadic")).not.toThrow();
+  });
+});
 describe("seeds", () => {
   it("a new primary redraws the primary, the neutral tint and the harmonies, and keeps the eye's steps elsewhere", () => {
     const moved = withStep(withSecondary(acme(), amber), "secondary", 5, {

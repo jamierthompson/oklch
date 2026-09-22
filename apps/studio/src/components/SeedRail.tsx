@@ -1,7 +1,6 @@
 import {
   formatHex,
   formatOklch,
-  maxChroma,
   parseColor,
   type OkLCH,
 } from "@jamiethompson/oklch";
@@ -14,27 +13,18 @@ import { Input } from "@/components/ui/input";
 import {
   hueSourceOf,
   isChromatic,
+  safeSeed,
+  SEED_L,
   withHarmony,
   withPrimary,
   withSecondary,
   type Theme,
 } from "@/lib/theme.ts";
 
-/** The lightness a seed can be dragged to: a hue survives at neither end. */
-const L_MIN = 0.05;
-const L_MAX = 0.95;
+const L_MIN = SEED_L.min;
+const L_MAX = SEED_L.max;
 /** Below this many degrees apart, two seeds read as tints of one hue. */
 const CLOSE_HUES = 20;
-
-const clamp = (v: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, v));
-
-/** A seed within the gamut's safe chroma at its lightness, so a ramp can be drawn through it. */
-function safe(c: OkLCH, gamut: Theme["gamut"]): OkLCH {
-  const L = clamp(c.L, L_MIN, L_MAX);
-  const H = ((c.H % 360) + 360) % 360;
-  return { L, C: clamp(c.C, 0, maxChroma(L, H, gamut)), H };
-}
 
 function Group({
   title,
@@ -82,7 +72,7 @@ function SeedEditor({
     }
     setError(onChange(parsed));
   };
-  const move = (next: OkLCH) => setError(onChange(safe(next, gamut)));
+  const move = (next: OkLCH) => setError(onChange(safeSeed(next, gamut)));
 
   return (
     <div className="grid gap-2">

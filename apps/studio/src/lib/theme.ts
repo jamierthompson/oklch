@@ -10,6 +10,7 @@ import {
   createRamp,
   formatOklch,
   HARMONY_KINDS,
+  maxChroma,
   parseColor,
   SHADCN_CHART_STEPS,
   SHADCN_TOKENS,
@@ -122,6 +123,18 @@ export const HARMONY_LABELS: Record<
       "Four hues at even quarters. The richest set, and the hardest to keep from competing.",
   },
 };
+
+/** The lightness a seed can sit at: a hue survives at neither end. */
+export const SEED_L = { min: 0.05, max: 0.95 } as const;
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, v));
+
+/** A seed within the gamut's safe chroma at its lightness, so a ramp can always be drawn through it. */
+export function safeSeed(c: OkLCH, gamut: Gamut): OkLCH {
+  const L = clamp(c.L, SEED_L.min, SEED_L.max);
+  const H = ((c.H % 360) + 360) % 360;
+  return { L, C: clamp(c.C, 0, maxChroma(L, H, gamut)), H };
+}
 
 export function isChromatic(c: OkLCH): boolean {
   return c.C >= ACHROMATIC;
@@ -399,17 +412,29 @@ export function withOverride(
   return { ...theme, overrides: { ...theme.overrides, [scheme]: next } };
 }
 
+/**
+ * Move one step. The step a seed sits on is the seed: moving it moves the
+ * seed too, kept within the safe chroma so the ramp can still be drawn
+ * through it, and nothing else redraws.
+ */
 export function withStep(
   theme: Theme,
   rampName: string,
   index: number,
   step: OkLCH,
 ): Theme {
+  const ramp = theme.ramps.find((r) => r.name === rampName);
+  const seeded =
+    ramp !== undefined &&
+    ramp.seed === index &&
+    (rampName === "primary" || rampName === "secondary");
+  const placed = seeded ? safeSeed(step, theme.gamut) : step;
   return {
     ...theme,
+    ...(seeded ? { [rampName]: placed } : {}),
     ramps: theme.ramps.map((r) =>
       r.name === rampName
-        ? { ...r, steps: r.steps.map((s, i) => (i === index ? step : s)) }
+        ? { ...r, steps: r.steps.map((s, i) => (i === index ? placed : s)) }
         : r,
     ),
   };

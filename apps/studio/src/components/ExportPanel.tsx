@@ -5,7 +5,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { buildBrand, type Brand } from "@jamiethompson/oklch-brand";
+import { type Brand } from "@/lib/brand.ts";
+import { buildBrand } from "@/lib/build.ts";
 import { download } from "@/lib/storage.ts";
 
 export function ExportPanel({

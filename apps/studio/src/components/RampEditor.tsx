@@ -15,29 +15,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import type {
-  Brand,
-  BrandRamp,
-  RampSeed,
-  ShadcnRole,
-  Stops,
-} from "@jamiethompson/oklch-brand";
+import {
+  rampOf,
+  ROLES,
+  rolesOf,
+  type Brand,
+  type BrandRamp,
+  type RampSeed,
+  type Role,
+  type Stops,
+} from "@/lib/brand.ts";
 import { fixed, stopName } from "@/lib/format.ts";
 import { usedBy, type Usage } from "@/lib/usage.ts";
-
-/** The roles a ramp can play, in the order they are offered. */
-export const ROLES: readonly ShadcnRole[] = [
-  "neutral",
-  "primary",
-  "destructive",
-  "secondary",
-  "accent",
-];
-
-/** Which ramp plays this role; `secondary` and `accent` default to the neutral. */
-export function rampOf(brand: Brand, role: ShadcnRole): string {
-  return brand.assignment[role] ?? brand.assignment.neutral;
-}
 
 function Field({
   label,
@@ -95,7 +84,9 @@ function howOf(brand: Brand, a: TokenAudit): "override" | "solved" | "picked" {
 /**
  * One ramp: its roles, its steps, and the step the eye has selected, with
  * every token that lands on that step and each one's verdict on its own
- * surface. The sliders move the selected step; the seed redraws the ramp.
+ * surface. The roles are how a ramp reaches the tokens: a token's ramp is
+ * its role's, so a ramp that plays nothing colors nothing. The sliders
+ * move the selected step; the seed redraws the ramp.
  */
 export function RampEditor({
   brand,
@@ -117,7 +108,7 @@ export function RampEditor({
   onSelect: (step: number) => void;
   onShowToken: (a: TokenAudit) => void;
   /** Give this ramp a role. */
-  onRole: (role: ShadcnRole) => void;
+  onRole: (role: Role) => void;
   onSeed: (seed: RampSeed) => void;
   onStep: (index: number, step: OkLCH) => void;
   onRemove: () => void;
@@ -128,7 +119,7 @@ export function RampEditor({
     [ramp.steps, brand.gamut],
   );
   const seed = ramp.seed;
-  const roles = ROLES.filter((role) => rampOf(brand, role) === ramp.name);
+  const roles = rolesOf(brand, ramp.name);
   const onStepTokens = (i: number) =>
     usedBy(usage, { ramp: ramp.name, step: i });
 
@@ -175,7 +166,7 @@ export function RampEditor({
                   />
                 }
               >
-                {role}
+                {role.replace("-", " ")}
               </Badge>
             );
           })}

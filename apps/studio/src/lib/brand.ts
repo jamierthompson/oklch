@@ -9,6 +9,7 @@ import {
   createRamp,
   formatOklch,
   parseColor,
+  SHADCN_CHART_STEPS,
   SHADCN_TOKENS,
   shadcnBindings,
   TAILWIND_STOPS,
@@ -25,9 +26,33 @@ import {
 
 export type Scheme = "light" | "dark";
 export type Stops = "chromatic" | "neutral";
-/** The roles a ramp can play; `charts` is per-step and lives in overrides. */
-export type ShadcnRole =
-  "neutral" | "primary" | "destructive" | "secondary" | "accent";
+
+/**
+ * The roles a ramp can play, in the order they are offered. A role is the
+ * only way a ramp gets into the palette: a token's ramp is its role's, and
+ * the eye moves steps, not ramps.
+ */
+export const ROLES = [
+  "neutral",
+  "primary",
+  "destructive",
+  "secondary",
+  "accent",
+  "sidebar",
+  "ring",
+  "chart-1",
+  "chart-2",
+  "chart-3",
+  "chart-4",
+  "chart-5",
+] as const;
+export type Role = (typeof ROLES)[number];
+type RequiredRole = "neutral" | "primary" | "destructive";
+
+/** Which ramp plays which role. A role left out plays on its default: `primary` for a chart series, `neutral` otherwise. */
+export type Assignment = { readonly [R in RequiredRole]: string } & {
+  readonly [R in Exclude<Role, RequiredRole>]?: string;
+};
 
 /** How a ramp was drafted; regenerating replays it over the eye's edits. */
 export type RampSeed =
@@ -53,19 +78,20 @@ export interface BrandRamp {
   readonly steps: readonly OkLCH[];
 }
 
-/** The eye's replacement for one token's preset binding. Surface and target stay the preset's. */
+/** The eye's replacement for one token's preset step, on the ramp its role plays. Surface and target stay the preset's. */
 export type Override =
-  | { readonly ramp: string; readonly step: number }
-  | { readonly ramp: string; readonly solve: true; readonly from: RampEnd };
+  { readonly step: number } | { readonly solve: true; readonly from: RampEnd };
+
+export const BRAND_VERSION = 2;
 
 export interface Brand {
-  readonly version: 1;
+  readonly version: typeof BRAND_VERSION;
   readonly id: string;
   readonly name: string;
   readonly gamut: Gamut;
   readonly radius: string;
   readonly ramps: readonly BrandRamp[];
-  readonly assignment: ShadcnAssignment;
+  readonly assignment: Assignment;
   readonly overrides: {
     readonly light: { readonly [token: string]: Override };
     readonly dark: { readonly [token: string]: Override };
@@ -136,7 +162,7 @@ export function newBrand(name: string, seed: string, gamut: Gamut): Brand {
     },
   ];
   return {
-    version: 1,
+    version: BRAND_VERSION,
     id: newId(),
     name,
     gamut,
@@ -151,12 +177,56 @@ export function rampsOf(brand: Brand): Ramp[] {
   return brand.ramps.map((r) => ({ name: r.name, steps: r.steps }));
 }
 
-/** The preset's bindings with the eye's overrides applied. */
+/** Which ramp plays this role: the one assigned, else the role's default. */
+export function rampOf(brand: Brand, role: Role): string {
+  const assigned = brand.assignment[role];
+  if (assigned !== undefined) return assigned;
+  return role.startsWith("chart-")
+    ? brand.assignment.primary
+    : brand.assignment.neutral;
+}
+
+/** Every role this ramp plays, in `ROLES` order. */
+export function rolesOf(brand: Brand, ramp: string): Role[] {
+  return ROLES.filter((role) => rampOf(brand, role) === ramp);
+}
+
+/** Give a ramp a role. Throws by name on a ramp the brand does not have. */
+export function withRole(brand: Brand, role: Role, ramp: string): Brand {
+  if (!brand.ramps.some((r) => r.name === ramp)) {
+    throw new Error(`no ramp named "${ramp}" to play ${role}`);
+  }
+  return { ...brand, assignment: { ...brand.assignment, [role]: ramp } };
+}
+
+/** The brand's roles as the preset takes them: a ramp per role, and the chart series on their ramps at the preset's steps. */
+export function assignmentOf(brand: Brand): ShadcnAssignment {
+  const series = (scheme: Scheme) => {
+    const [s1, s2, s3, s4, s5] = SHADCN_CHART_STEPS[scheme];
+    const at = (i: 1 | 2 | 3 | 4 | 5, step: number) => ({
+      ramp: rampOf(brand, `chart-${i}`),
+      step,
+    });
+    return [at(1, s1), at(2, s2), at(3, s3), at(4, s4), at(5, s5)] as const;
+  };
+  return {
+    neutral: rampOf(brand, "neutral"),
+    primary: rampOf(brand, "primary"),
+    destructive: rampOf(brand, "destructive"),
+    secondary: rampOf(brand, "secondary"),
+    accent: rampOf(brand, "accent"),
+    sidebar: rampOf(brand, "sidebar"),
+    ring: rampOf(brand, "ring"),
+    charts: { light: series("light"), dark: series("dark") },
+  };
+}
+
+/** The preset's bindings with the eye's overrides applied: each on the ramp its role plays. */
 export function bindingsOf(brand: Brand): {
   light: Binding[];
   dark: Binding[];
 } {
-  const preset = shadcnBindings(brand.assignment, rampsOf(brand));
+  const preset = shadcnBindings(assignmentOf(brand), rampsOf(brand));
   const apply = (scheme: Scheme): Binding[] =>
     preset[scheme].map((b) => {
       const o = brand.overrides[scheme][b.token];
@@ -166,8 +236,8 @@ export function bindingsOf(brand: Brand): {
           ? {}
           : { on: b.on, target: b.target };
       return "solve" in o
-        ? { token: b.token, ramp: o.ramp, ...pairing, from: o.from }
-        : { token: b.token, ramp: o.ramp, step: o.step, ...pairing };
+        ? { token: b.token, ramp: b.ramp, ...pairing, from: o.from }
+        : { token: b.token, ramp: b.ramp, step: o.step, ...pairing };
     });
   return { light: apply("light"), dark: apply("dark") };
 }
@@ -213,28 +283,22 @@ export function snapTo(
   token: string,
 ): Override | null {
   const from = fromOf(brand, scheme, token);
-  const ramp = bindingsOf(brand)[scheme].find((b) => b.token === token)?.ramp;
-  if (ramp === undefined) return null;
-  const solved = withOverride(brand, scheme, token, {
-    ramp,
-    solve: true,
-    from,
-  });
+  const solved = withOverride(brand, scheme, token, { solve: true, from });
   const outcome = auditOf(solved)[scheme].find(
     (a) => a.token === token,
   )?.outcome;
   return outcome === undefined || outcome.kind === "unresolved"
     ? null
-    : { ramp, step: outcome.resolved.step };
+    : { step: outcome.resolved.step };
 }
 
 /** Which end a solve walks from for this token: the override's, else the preset's, else the start. */
 export function fromOf(brand: Brand, scheme: Scheme, token: string): RampEnd {
   const o = brand.overrides[scheme][token];
   if (o !== undefined && "solve" in o) return o.from;
-  const preset = shadcnBindings(brand.assignment, rampsOf(brand))[scheme].find(
-    (b) => b.token === token,
-  );
+  const preset = shadcnBindings(assignmentOf(brand), rampsOf(brand))[
+    scheme
+  ].find((b) => b.token === token);
   return preset?.from ?? "start";
 }
 
@@ -301,24 +365,12 @@ export function withRamp(brand: Brand, name: string, seed: RampSeed): Brand {
   };
 }
 
-/** Removes a ramp no role or override names. Throws by name otherwise. */
+/** Removes a ramp that plays no role. Throws by name otherwise. */
 export function withoutRamp(brand: Brand, name: string): Brand {
-  const roles = Object.entries(brand.assignment).filter(
-    ([role, v]) => role !== "charts" && v === name,
-  );
+  const roles = rolesOf(brand, name);
   if (roles.length > 0) {
     throw new Error(
-      `ramp "${name}" plays ${roles.map(([r]) => r).join(", ")}; assign another ramp first`,
-    );
-  }
-  const used = (["light", "dark"] as const).flatMap((s) =>
-    Object.entries(brand.overrides[s])
-      .filter(([, o]) => o.ramp === name)
-      .map(([t]) => `${s}/${t}`),
-  );
-  if (used.length > 0) {
-    throw new Error(
-      `ramp "${name}" is picked by ${used.join(", ")}; move those first`,
+      `ramp "${name}" plays ${roles.join(", ")}; give ${roles.length === 1 ? "that role" : "those roles"} another ramp first`,
     );
   }
   return { ...brand, ramps: brand.ramps.filter((r) => r.name !== name) };
@@ -332,13 +384,46 @@ export function serialize(brand: Brand): string {
   return JSON.stringify(brand, null, 2);
 }
 
-/** Reads a brand back, naming what is wrong with it. */
+/**
+ * A version 1 document, as version 2. Version 1 let an override name a
+ * ramp of its own; now a token's ramp is its role's, so the ramp is
+ * dropped and the step or solve kept. A step that was picked on another
+ * ramp lands on the role's ramp at the same index, where the audit will
+ * say whether it clears.
+ */
+function migrate(b: Record<string, unknown>): Record<string, unknown> {
+  if (b["version"] !== 1) return b;
+  const overrides = (b["overrides"] ?? {}) as Record<
+    string,
+    Record<string, Record<string, unknown>>
+  >;
+  const strip = (scheme: string) =>
+    Object.fromEntries(
+      Object.entries(overrides[scheme] ?? {}).map(([token, o]) => {
+        const rest = { ...o };
+        delete rest["ramp"];
+        return [token, rest];
+      }),
+    );
+  const assignment = {
+    ...((b["assignment"] ?? {}) as Record<string, unknown>),
+  };
+  delete assignment["charts"];
+  return {
+    ...b,
+    version: BRAND_VERSION,
+    assignment,
+    overrides: { light: strip("light"), dark: strip("dark") },
+  };
+}
+
+/** Reads a brand back, naming what is wrong with it. A version 1 file is read as version 2. */
 export function parse(text: string): Brand {
   const raw: unknown = JSON.parse(text);
   if (typeof raw !== "object" || raw === null) throw new Error("not an object");
-  const b = raw as Record<string, unknown>;
-  if (b["version"] !== 1)
-    throw new Error(`version ${String(b["version"])} is not 1`);
+  const b = migrate(raw as Record<string, unknown>);
+  if (b["version"] !== BRAND_VERSION)
+    throw new Error(`version ${String(b["version"])} is not ${BRAND_VERSION}`);
   for (const key of ["id", "name", "radius"] as const) {
     if (typeof b[key] !== "string") throw new Error(`${key} is not a string`);
   }
@@ -365,10 +450,21 @@ export function parse(text: string): Brand {
       }
     }
   }
-  const brand = raw as Brand;
+  const brand = b as unknown as Brand;
   const names = new Set(brand.ramps.map((r) => r.name));
+  if (typeof brand.assignment !== "object" || brand.assignment === null) {
+    throw new Error("assignment is not an object");
+  }
+  for (const role of ["neutral", "primary", "destructive"] as const) {
+    if (typeof brand.assignment[role] !== "string") {
+      throw new Error(`${role} names no ramp`);
+    }
+  }
   for (const [role, v] of Object.entries(brand.assignment)) {
-    if (role !== "charts" && !names.has(v as string)) {
+    if (!(ROLES as readonly string[]).includes(role)) {
+      throw new Error(`"${role}" is not a role`);
+    }
+    if (!names.has(v as string)) {
       throw new Error(
         `${role} names ramp "${String(v)}", which the brand does not have`,
       );
@@ -379,9 +475,14 @@ export function parse(text: string): Brand {
       if (!(SHADCN_TOKENS as readonly string[]).includes(t)) {
         throw new Error(`${s} override "${t}" is not a shadcn token`);
       }
-      if (!names.has(o.ramp)) {
+      const isStep = "step" in o && Number.isInteger(o.step) && !("solve" in o);
+      const isSolve =
+        "solve" in o &&
+        o.solve === true &&
+        (o.from === "start" || o.from === "end");
+      if (!isStep && !isSolve) {
         throw new Error(
-          `${s} override "${t}" names ramp "${o.ramp}", which the brand does not have`,
+          `${s} override "${t}" is neither a step nor a solve from "start" or "end"`,
         );
       }
     }

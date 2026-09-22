@@ -27,7 +27,7 @@ import {
   withOverride,
   type Brand,
   type Scheme,
-} from "@jamiethompson/oklch-brand";
+} from "@/lib/brand.ts";
 import { STOP_NAMES } from "@/lib/format.ts";
 import { landedOn, stepKey, type StepRef } from "@/lib/usage.ts";
 
@@ -68,26 +68,12 @@ function Cell({
     landed !== null &&
     selection !== null &&
     stepKey(landed) === stepKey(selection);
-  const rampItems = Object.fromEntries(
-    brand.ramps.map((r) => [r.name, r.name]),
-  );
   const stepItems: Record<string, string> = {
     ...Object.fromEntries(STOP_NAMES.map((n, i) => [String(i), n])),
     ...(binding.on === undefined
       ? {}
       : { solve: `solve from ${fromOf(brand, scheme, token)}` }),
   };
-  const setRamp = (ramp: string) =>
-    onUpdate(
-      withOverride(
-        brand,
-        scheme,
-        token,
-        solved
-          ? { ramp, solve: true, from: fromOf(brand, scheme, token) }
-          : { ramp, step: binding.step! },
-      ),
-    );
   const setStep = (v: string) =>
     onUpdate(
       withOverride(
@@ -95,12 +81,8 @@ function Cell({
         scheme,
         token,
         v === "solve"
-          ? {
-              ramp: binding.ramp,
-              solve: true,
-              from: fromOf(brand, scheme, token),
-            }
-          : { ramp: binding.ramp, step: Number(v) },
+          ? { solve: true, from: fromOf(brand, scheme, token) }
+          : { step: Number(v) },
       ),
     );
   const stepLabel = solved
@@ -131,25 +113,12 @@ function Cell({
         >
           <Swatch color={colorOf(a.outcome)} on={surface} />
         </button>
-        <Select
-          value={binding.ramp}
-          onValueChange={(v) => v !== null && setRamp(v)}
-          items={rampItems}
+        <span
+          className="w-16 truncate text-xs text-muted-foreground"
+          title={`${token} is on the ${binding.ramp} ramp, by its role`}
         >
-          <SelectTrigger
-            aria-label={`${scheme} ${token} ramp`}
-            className="h-8 w-28"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {brand.ramps.map((r) => (
-              <SelectItem key={r.name} value={r.name}>
-                {r.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {binding.ramp}
+        </span>
         <Select
           value={stepValue}
           onValueChange={(v) => v !== null && setStep(v)}
@@ -183,7 +152,7 @@ function Cell({
               const snapped = snapTo(brand, scheme, token);
               if (snapped === null) {
                 setNote(
-                  `no step of ${binding.ramp} clears on ${binding.on}; pick another ramp, or move ${binding.on}`,
+                  `no step of ${binding.ramp} clears on ${binding.on}; move ${binding.on}, or give its role another ramp`,
                 );
               } else {
                 setNote(null);
@@ -212,9 +181,10 @@ function Cell({
 }
 
 /**
- * Every shadcn token in both schemes: where it comes from, its verdict on
- * its surface, and the eye's way to move it. A token's swatch locates the
- * step it landed on; cells on the selected step are highlighted.
+ * Every shadcn token in both schemes: the ramp its role put it on, the step
+ * it sits at, its verdict on its surface, and the eye's way to move the
+ * step. A token's swatch locates the step it landed on; cells on the
+ * selected step are highlighted.
  */
 export function TokensPanel({
   brand,

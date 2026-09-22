@@ -3,12 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { TokensPanel } from "./TokensPanel.tsx";
-import {
-  auditOf,
-  newBrand,
-  withOverride,
-  type Brand,
-} from "@jamiethompson/oklch-brand";
+import { auditOf, newBrand, withOverride, type Brand } from "@/lib/brand.ts";
 
 const acme = () => newBrand("Acme", "#2563eb", "srgb");
 const rowOf = (token: string) =>
@@ -17,12 +12,18 @@ const rowOf = (token: string) =>
     .find((r) => r.querySelector("td")?.textContent === token)!;
 
 describe("TokensPanel", () => {
-  it("shows every token with a verdict in both schemes", () => {
+  it("shows every token with a verdict in both schemes, on its role's ramp", () => {
     const brand = acme();
     render(
       <TokensPanel brand={brand} audit={auditOf(brand)} onUpdate={() => {}} />,
     );
     expect(screen.getAllByRole("row")).toHaveLength(32);
+    // The ramp is shown, not chosen: a token's ramp is its role's.
+    expect(screen.queryAllByRole("combobox", { name: /ramp$/ })).toHaveLength(
+      0,
+    );
+    expect(within(rowOf("primary")).getAllByText("brand")).toHaveLength(2);
+    expect(within(rowOf("chart-2")).getAllByText("brand")).toHaveLength(2);
     const background = rowOf("background");
     expect(within(background).getAllByText("no pairing")).toHaveLength(2);
     const foreground = rowOf("foreground");
@@ -33,10 +34,7 @@ describe("TokensPanel", () => {
   });
 
   it("shows a failing pick as failing, and Snap moves it to a step that clears", async () => {
-    const failing = withOverride(acme(), "light", "primary", {
-      ramp: "brand",
-      step: 1,
-    });
+    const failing = withOverride(acme(), "light", "primary", { step: 1 });
     const onUpdate = vi.fn<(b: Brand) => void>();
     render(
       <TokensPanel
@@ -53,7 +51,6 @@ describe("TokensPanel", () => {
     expect(onUpdate).toHaveBeenCalledTimes(1);
     const next = onUpdate.mock.calls[0]![0];
     expect(next.overrides.light["primary"]).toEqual({
-      ramp: "brand",
       step: expect.any(Number),
     });
     expect(
@@ -62,10 +59,7 @@ describe("TokensPanel", () => {
   });
 
   it("Reset drops the override", async () => {
-    const picked = withOverride(acme(), "dark", "card", {
-      ramp: "neutral",
-      step: 8,
-    });
+    const picked = withOverride(acme(), "dark", "card", { step: 8 });
     const onUpdate = vi.fn<(b: Brand) => void>();
     render(
       <TokensPanel

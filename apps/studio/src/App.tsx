@@ -1,9 +1,4 @@
-import {
-  auditOf,
-  newBrand,
-  parse,
-  type Brand,
-} from "@jamiethompson/oklch-brand";
+import { auditOf, newBrand, parse, type Brand } from "@/lib/brand.ts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { BrandBar } from "@/components/BrandBar.tsx";

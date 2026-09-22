@@ -3,12 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { PalettePanel } from "./PalettePanel.tsx";
-import {
-  auditOf,
-  newBrand,
-  withOverride,
-  type Brand,
-} from "@jamiethompson/oklch-brand";
+import { auditOf, newBrand, withOverride, type Brand } from "@/lib/brand.ts";
 
 const acme = () => newBrand("Acme", "#2563eb", "srgb");
 const panel = (brand: Brand, onUpdate = vi.fn<(b: Brand) => void>()) => {
@@ -37,6 +32,21 @@ describe("PalettePanel", () => {
     expect(
       ramp("brand").getByRole("button", { name: "accent role on brand" }),
     ).toHaveAttribute("aria-pressed", "false");
+    // The chart series default to the primary ramp.
+    expect(
+      ramp("brand").getByRole("button", { name: "chart-3 role on brand" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("giving a chart series a ramp moves that token to it", async () => {
+    const onUpdate = panel(acme());
+    await userEvent.click(
+      ramp("red").getByRole("button", { name: "chart-2 role on red" }),
+    );
+    const next = onUpdate.mock.calls[0]![0];
+    expect(next.assignment["chart-2"]).toBe("red");
+    const chart2 = auditOf(next).light.find((a) => a.token === "chart-2")!;
+    expect(chart2.binding.ramp).toBe("red");
   });
 
   it("clicking a role on a ramp gives that ramp the role", async () => {
@@ -84,10 +94,7 @@ describe("PalettePanel", () => {
   });
 
   it("a step with a failing token is marked on the ramp, and the token says why", async () => {
-    const failing = withOverride(acme(), "light", "primary", {
-      ramp: "brand",
-      step: 1,
-    });
+    const failing = withOverride(acme(), "light", "primary", { step: 1 });
     panel(failing);
     const brand = ramp("brand");
     expect(brand.getByLabelText("1 token on brand 100")).toHaveClass(

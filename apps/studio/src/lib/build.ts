@@ -5,7 +5,7 @@ import {
   type TokenSetAudit,
 } from "@jamiethompson/oklch";
 
-import { auditOf, type Brand } from "./brand.js";
+import { auditOf, type Brand } from "./brand.ts";
 
 /** One file that ships: its name, contents, and media type. */
 export interface Output {

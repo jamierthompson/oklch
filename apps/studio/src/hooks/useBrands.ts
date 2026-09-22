@@ -1,4 +1,4 @@
-import { newId, type Brand } from "@jamiethompson/oklch-brand";
+import { newId, type Brand } from "@/lib/brand.ts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { load, save, type Stored } from "@/lib/storage.ts";

@@ -1,4 +1,4 @@
-import { withGamut, type Brand } from "@jamiethompson/oklch-brand";
+import { withGamut, type Brand } from "@/lib/brand.ts";
 import { useRef } from "react";
 
 import { SeedPicker } from "@/components/SeedPicker.tsx";

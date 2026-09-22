@@ -5,6 +5,7 @@ import { createRamp, TAILWIND_STOPS } from "./tier2.js";
 import { auditTokenSet } from "./audit.js";
 import { buildTokenSet, type Ramp } from "./binding.js";
 import {
+  SHADCN_CHART_STEPS,
   SHADCN_TOKENS,
   shadcnBindings,
   tokenSetToRegistryItem,
@@ -120,6 +121,39 @@ describe("shadcnBindings", () => {
     expect(custom.find((b) => b.token === "accent")!.ramp).toBe("teal");
     expect(custom.find((b) => b.token === "sidebar-accent")!.ramp).toBe("teal");
     expect(custom.find((b) => b.token === "secondary")!.ramp).toBe("teal");
+  });
+
+  it("puts the sidebar and the focus rings on their own ramps when given", () => {
+    const defaults = shadcnBindings(ASSIGNMENT, RAMPS).light;
+    expect(defaults.find((b) => b.token === "sidebar")!.ramp).toBe("gray");
+    expect(defaults.find((b) => b.token === "ring")!.ramp).toBe("gray");
+    const custom = shadcnBindings(
+      { ...ASSIGNMENT, sidebar: "blue", ring: "blue" },
+      RAMPS,
+    ).light;
+    for (const token of ["sidebar", "sidebar-border", "ring", "sidebar-ring"]) {
+      expect(custom.find((b) => b.token === token)!.ramp, token).toBe("blue");
+    }
+    // The sidebar's ink still comes from the neutral, solved on the new surface.
+    const ink = custom.find((b) => b.token === "sidebar-foreground")!;
+    expect(ink.ramp).toBe("gray");
+    expect(ink.on).toBe("sidebar");
+  });
+
+  it("charts default to SHADCN_CHART_STEPS of the primary ramp", () => {
+    const { light, dark } = shadcnBindings(ASSIGNMENT, RAMPS);
+    for (const [scheme, bindings] of [
+      ["light", light],
+      ["dark", dark],
+    ] as const) {
+      SHADCN_CHART_STEPS[scheme].forEach((step, i) => {
+        expect(bindings.find((b) => b.token === `chart-${i + 1}`)).toEqual({
+          token: `chart-${i + 1}`,
+          ramp: "blue",
+          step,
+        });
+      });
+    }
   });
 
   it("takes the chart series as given, per scheme", () => {

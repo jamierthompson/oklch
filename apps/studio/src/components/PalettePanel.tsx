@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label";
 import {
   withoutRamp,
   withRamp,
+  withRole,
   withSeed,
   withStep,
   type Brand,
-} from "@jamiethompson/oklch-brand";
+} from "@/lib/brand.ts";
 import { usageOf, type StepRef } from "@/lib/usage.ts";
 
 /** The step selected when nothing has been: the first ramp's middle. */
@@ -27,7 +28,8 @@ function scrollTo(id: string) {
 /**
  * The palette as one view: the ramps and the tokens bound to them, sharing
  * one selected step. A step shows the tokens that land on it; a token
- * locates the step it came from. Roles are given on the ramp that plays them.
+ * locates the step it came from. Roles are given on the ramp that plays
+ * them, and a token's ramp is its role's: the eye moves steps, not ramps.
  */
 export function PalettePanel({
   brand,
@@ -77,12 +79,7 @@ export function PalettePanel({
           selected={selection?.ramp === ramp.name ? selection.step : null}
           onSelect={(step) => setSelected({ ramp: ramp.name, step })}
           onShowToken={showToken}
-          onRole={(role) =>
-            onUpdate({
-              ...brand,
-              assignment: { ...brand.assignment, [role]: ramp.name },
-            })
-          }
+          onRole={(role) => onUpdate(withRole(brand, role, ramp.name))}
           onSeed={(seed) => onUpdate(withSeed(brand, ramp.name, seed))}
           onStep={(i, s) => onUpdate(withStep(brand, ramp.name, i, s))}
           onRemove={() => attempt(() => withoutRamp(brand, ramp.name))}
@@ -127,8 +124,9 @@ export function PalettePanel({
       <section className="grid gap-2" aria-label="tokens">
         <h3 className="font-medium">Tokens</h3>
         <p className="text-xs text-muted-foreground">
-          Every shadcn variable, in both schemes. A swatch shows the step it
-          came from; the highlighted cells sit on the selected step.
+          Every shadcn variable, in both schemes, on the ramp its role plays. A
+          swatch shows the step it came from; the highlighted cells sit on the
+          selected step.
         </p>
         <TokensPanel
           brand={brand}

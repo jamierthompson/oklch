@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { newBrand, withOverride } from "./brand.ts";
-import { buildBrand, describeFailures, slug } from "./build.ts";
+import { newTheme, withOverride } from "./theme.ts";
+import { buildTheme, describeFailures, slug } from "./build.ts";
 
-const acme = () => newBrand("Acme Corp", "#2563eb", "srgb");
+const acme = () => newTheme("Acme Corp", "#2563eb", "srgb");
 
-describe("buildBrand", () => {
-  it("ships three files named for the brand when every token clears", () => {
-    const built = buildBrand(acme());
+describe("buildTheme", () => {
+  it("ships three files named for the theme when every token clears", () => {
+    const built = buildTheme(acme());
     expect(built.audit.passes).toBe(true);
     expect(built.outputs).not.toBeNull();
     const { css, registry, dtcg } = built.outputs!;
@@ -36,7 +36,7 @@ describe("buildBrand", () => {
 
   it("ships nothing while a token fails, and says which", () => {
     const failing = withOverride(acme(), "light", "primary", { step: 1 });
-    const built = buildBrand(failing);
+    const built = buildTheme(failing);
     expect(built.outputs).toBeNull();
     const lines = describeFailures(built.audit);
     expect(lines).toHaveLength(1);
@@ -47,6 +47,6 @@ describe("buildBrand", () => {
 
   it("slugs a name", () => {
     expect(slug("  Acme  Corp! ")).toBe("acme-corp");
-    expect(slug("!!!")).toBe("brand");
+    expect(slug("!!!")).toBe("theme");
   });
 });

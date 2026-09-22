@@ -7,17 +7,17 @@ import { SEEDS } from "@/lib/seeds.ts";
 
 const storedNames = () =>
   (
-    JSON.parse(localStorage.getItem("oklch-studio/brands")!) as {
-      brands: { name: string }[];
+    JSON.parse(localStorage.getItem("oklch-studio/themes")!) as {
+      themes: { name: string }[];
     }
-  ).brands.map((b) => b.name);
+  ).themes.map((b) => b.name);
 
 describe("App", () => {
   beforeEach(() => localStorage.clear());
 
   it("opens empty, with the seed colors and nothing created", () => {
     render(<App />);
-    expect(screen.getByText("No brand yet")).toBeInTheDocument();
+    expect(screen.getByText("No theme yet")).toBeInTheDocument();
     for (const s of SEEDS)
       expect(screen.getByRole("button", { name: s.name })).toBeInTheDocument();
     expect(screen.queryByTestId("preview-light")).not.toBeInTheDocument();
@@ -29,7 +29,7 @@ describe("App", () => {
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: "Forest" }));
     expect(screen.getByText("Draft · not saved")).toBeInTheDocument();
-    expect(screen.getByLabelText("Brand name")).toHaveValue("Forest");
+    expect(screen.getByLabelText("Theme name")).toHaveValue("Forest");
     const light = screen.getByTestId("preview-light");
     const dark = screen.getByTestId("preview-dark");
     expect(light.style.getPropertyValue("--primary")).toMatch(/^oklch\(/);
@@ -59,7 +59,7 @@ describe("App", () => {
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: "Forest" }));
     await userEvent.click(screen.getByRole("button", { name: "Coral" }));
-    expect(screen.getByLabelText("Brand name")).toHaveValue("Coral");
+    expect(screen.getByLabelText("Theme name")).toHaveValue("Coral");
     expect(
       screen.queryByText("Replace the edited draft?"),
     ).not.toBeInTheDocument();
@@ -69,26 +69,26 @@ describe("App", () => {
   it("asks before replacing a draft that was edited", async () => {
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: "Forest" }));
-    await userEvent.type(screen.getByLabelText("Brand name"), " Co");
+    await userEvent.type(screen.getByLabelText("Theme name"), " Co");
     await userEvent.click(screen.getByRole("button", { name: "Coral" }));
     expect(
       await screen.findByText("Replace the edited draft?"),
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
-    expect(screen.getByLabelText("Brand name")).toHaveValue("Forest Co");
+    expect(screen.getByLabelText("Theme name")).toHaveValue("Forest Co");
     await userEvent.click(screen.getByRole("button", { name: "Coral" }));
     await userEvent.click(
       await screen.findByRole("button", { name: "Replace draft" }),
     );
-    expect(screen.getByLabelText("Brand name")).toHaveValue("Coral");
+    expect(screen.getByLabelText("Theme name")).toHaveValue("Coral");
   });
 
-  it("saving the draft is what stores a brand; discarding returns to empty", async () => {
+  it("saving the draft is what stores a theme; discarding returns to empty", async () => {
     render(<App />);
     await userEvent.click(screen.getByRole("button", { name: "Ocean" }));
-    await userEvent.clear(screen.getByLabelText("Brand name"));
-    await userEvent.type(screen.getByLabelText("Brand name"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Save brand" }));
+    await userEvent.clear(screen.getByLabelText("Theme name"));
+    await userEvent.type(screen.getByLabelText("Theme name"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Save theme" }));
     expect(storedNames()).toEqual(["Acme"]);
     expect(screen.queryByText("Draft · not saved")).not.toBeInTheDocument();
     // The preview has a Delete button of its own; the header's is the one that acts.
@@ -103,10 +103,10 @@ describe("App", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Discard draft" }),
     );
-    expect(screen.getByLabelText("Brand name")).toHaveValue("Acme");
+    expect(screen.getByLabelText("Theme name")).toHaveValue("Acme");
 
     await userEvent.click(header().getByRole("button", { name: "Delete" }));
-    expect(screen.getByText("No brand yet")).toBeInTheDocument();
+    expect(screen.getByText("No theme yet")).toBeInTheDocument();
     expect(storedNames()).toEqual([]);
   });
 
@@ -115,6 +115,6 @@ describe("App", () => {
     await userEvent.type(screen.getByLabelText("Or your own color"), "blueish");
     await userEvent.click(screen.getByRole("button", { name: "Try" }));
     expect(screen.getByText(/"blueish" is not a color/)).toBeInTheDocument();
-    expect(screen.getByText("No brand yet")).toBeInTheDocument();
+    expect(screen.getByText("No theme yet")).toBeInTheDocument();
   });
 });

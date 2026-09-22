@@ -5,19 +5,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { type Brand } from "@/lib/brand.ts";
-import { buildBrand } from "@/lib/build.ts";
+import { type Theme } from "@/lib/theme.ts";
+import { buildTheme } from "@/lib/build.ts";
 import { download } from "@/lib/storage.ts";
 
 export function ExportPanel({
-  brand,
+  theme,
   audit,
 }: {
-  brand: Brand;
+  theme: Theme;
   audit: TokenSetAudit;
 }) {
   const [tab, setTab] = useState("css");
-  const outputs = useMemo(() => buildBrand(brand).outputs, [brand]);
+  const outputs = useMemo(() => buildTheme(theme).outputs, [theme]);
   if (outputs === null) {
     const failing = [...audit.light, ...audit.dark].filter(
       (a) => a.outcome.kind !== "clears",

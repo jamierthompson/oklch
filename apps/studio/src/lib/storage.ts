@@ -1,35 +1,35 @@
-/** Brands live in localStorage. */
+/** Themes live in localStorage. */
 
-import { parse, type Brand } from "@/lib/brand.ts";
+import { parse, type Theme } from "@/lib/theme.ts";
 
-const KEY = "oklch-studio/brands";
+const KEY = "oklch-studio/themes";
 
 export interface Stored {
-  readonly brands: readonly Brand[];
+  readonly themes: readonly Theme[];
   readonly current: string | null;
 }
 
 export function load(): Stored {
   try {
     const text = localStorage.getItem(KEY);
-    if (text === null) return { brands: [], current: null };
-    const raw = JSON.parse(text) as { brands?: unknown[]; current?: unknown };
-    const brands: Brand[] = [];
-    for (const b of raw.brands ?? []) {
+    if (text === null) return { themes: [], current: null };
+    const raw = JSON.parse(text) as { themes?: unknown[]; current?: unknown };
+    const themes: Theme[] = [];
+    for (const b of raw.themes ?? []) {
       try {
-        brands.push(parse(JSON.stringify(b)));
+        themes.push(parse(JSON.stringify(b)));
       } catch {
-        // A brand this version cannot read is left where it is, not dropped.
+        // A theme this version cannot read is left where it is, not dropped.
       }
     }
     const current =
       typeof raw.current === "string" &&
-      brands.some((b) => b.id === raw.current)
+      themes.some((b) => b.id === raw.current)
         ? raw.current
-        : (brands[0]?.id ?? null);
-    return { brands, current };
+        : (themes[0]?.id ?? null);
+    return { themes, current };
   } catch {
-    return { brands: [], current: null };
+    return { themes: [], current: null };
   }
 }
 

@@ -5,7 +5,7 @@ import {
   auditOf,
   bindingsOf,
   cssVarsOf,
-  newBrand,
+  newTheme,
   parse,
   rampOf,
   rolesOf,
@@ -17,15 +17,15 @@ import {
   withRole,
   withSecondary,
   withStep,
-} from "./brand.ts";
+} from "./theme.ts";
 
-const acme = () => newBrand("Acme", "#2563eb", "srgb");
+const acme = () => newTheme("Acme", "#2563eb", "srgb");
 const names = (b: ReturnType<typeof acme>) => b.ramps.map((r) => r.name);
 const amber = { L: 0.7, C: 0.15, H: 70 };
 const rampNamed = (b: ReturnType<typeof acme>, name: string) =>
   b.ramps.find((r) => r.name === name)!;
 
-describe("newBrand", () => {
+describe("newTheme", () => {
   it("drafts a tinted neutral, the primary through the seed, a red, and the analogous harmonies", () => {
     const b = acme();
     expect(names(b)).toEqual([
@@ -60,7 +60,7 @@ describe("newBrand", () => {
   });
 
   it("refuses a seed that is not a color", () => {
-    expect(() => newBrand("x", "blue-ish", "srgb")).toThrow(/not a color/);
+    expect(() => newTheme("x", "blue-ish", "srgb")).toThrow(/not a color/);
   });
 });
 
@@ -87,7 +87,7 @@ describe("roles", () => {
     expect(rampOf(b, "chart-3")).toBe("harmony-1");
     const chosen = withRole(b, "chart-3", "harmony-2");
     expect(rampOf(chosen, "chart-3")).toBe("harmony-2");
-    // A choice naming a ramp the brand no longer has falls back to the default.
+    // A choice naming a ramp the theme no longer has falls back to the default.
     expect(rampOf(withHarmony(chosen, "complementary"), "chart-3")).toBe(
       "harmony-1",
     );
@@ -152,7 +152,7 @@ describe("seeds", () => {
   });
 
   it("an achromatic primary builds the tint and the harmonies on the secondary's hue, or on nothing", () => {
-    const gray = newBrand("Gray", "#475569", "srgb");
+    const gray = newTheme("Gray", "#475569", "srgb");
     const flat = withPrimary(gray, { L: 0.4, C: 0.005, H: 0 });
     expect(names(flat)).toEqual(["primary", "neutral", "red"]);
     expect(rampNamed(flat, "neutral").steps[5]!.C).toBe(0);

@@ -17,8 +17,8 @@ import {
   withHarmony,
   withPrimary,
   withSecondary,
-  type Brand,
-} from "@/lib/brand.ts";
+  type Theme,
+} from "@/lib/theme.ts";
 
 /** The lightness a seed can be dragged to: a hue survives at neither end. */
 const L_MIN = 0.05;
@@ -30,7 +30,7 @@ const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
 
 /** A seed within the gamut's safe chroma at its lightness, so a ramp can be drawn through it. */
-function safe(c: OkLCH, gamut: Brand["gamut"]): OkLCH {
+function safe(c: OkLCH, gamut: Theme["gamut"]): OkLCH {
   const L = clamp(c.L, L_MIN, L_MAX);
   const H = ((c.H % 360) + 360) % 360;
   return { L, C: clamp(c.C, 0, maxChroma(L, H, gamut)), H };
@@ -66,7 +66,7 @@ function SeedEditor({
 }: {
   label: string;
   color: OkLCH;
-  gamut: Brand["gamut"];
+  gamut: Theme["gamut"];
   onChange: (c: OkLCH) => string | null;
 }) {
   const hex = formatHex(color).hex;
@@ -132,9 +132,9 @@ function SeedEditor({
 }
 
 /** What the seeds imply that the eye should know. */
-function notesOf(brand: Brand): string[] {
+function notesOf(theme: Theme): string[] {
   const notes: string[] = [];
-  const { primary, secondary } = brand;
+  const { primary, secondary } = theme;
   if (!isChromatic(primary)) {
     notes.push(
       secondary !== null && isChromatic(secondary)
@@ -144,7 +144,7 @@ function notesOf(brand: Brand): string[] {
   }
   if (secondary !== null && !isChromatic(secondary)) {
     notes.push(
-      "The secondary has no hue: its ramp is a true gray, so secondary surfaces read as neutral. Faithful to the brand, not a bug.",
+      "The secondary has no hue: its ramp is a true gray, so secondary surfaces read as neutral. Faithful to the theme, not a bug.",
     );
   }
   if (secondary !== null && isChromatic(primary) && isChromatic(secondary)) {
@@ -164,17 +164,17 @@ function notesOf(brand: Brand): string[] {
  * steps on the others; the ramps themselves are edited in the palette.
  */
 export function SeedRail({
-  brand,
+  theme,
   onUpdate,
   className = "",
 }: {
-  brand: Brand;
-  onUpdate: (b: Brand) => void;
+  theme: Theme;
+  onUpdate: (b: Theme) => void;
   className?: string;
 }) {
   const [secondaryText, setSecondaryText] = useState("");
   const [secondaryError, setSecondaryError] = useState<string | null>(null);
-  const attempt = (f: () => Brand): string | null => {
+  const attempt = (f: () => Theme): string | null => {
     try {
       onUpdate(f());
       return null;
@@ -188,26 +188,26 @@ export function SeedRail({
       setSecondaryError(`"${secondaryText.trim()}" is not a color`);
       return;
     }
-    const error = attempt(() => withSecondary(brand, parsed));
+    const error = attempt(() => withSecondary(theme, parsed));
     setSecondaryError(error);
     if (error === null) setSecondaryText("");
   };
-  const source = hueSourceOf(brand.primary, brand.secondary);
-  const notes = notesOf(brand);
+  const source = hueSourceOf(theme.primary, theme.secondary);
+  const notes = notesOf(theme);
 
   return (
     <aside className={`grid content-start ${className}`} aria-label="Seeds">
       <Group title="Primary seed">
         <SeedEditor
           label="Primary"
-          color={brand.primary}
-          gamut={brand.gamut}
-          onChange={(c) => attempt(() => withPrimary(brand, c))}
+          color={theme.primary}
+          gamut={theme.gamut}
+          onChange={(c) => attempt(() => withPrimary(theme, c))}
         />
       </Group>
 
       <Group title="Secondary seed">
-        {brand.secondary === null ? (
+        {theme.secondary === null ? (
           <div className="grid gap-2">
             <div className="flex gap-2">
               <Input
@@ -238,15 +238,15 @@ export function SeedRail({
           <>
             <SeedEditor
               label="Secondary"
-              color={brand.secondary}
-              gamut={brand.gamut}
-              onChange={(c) => attempt(() => withSecondary(brand, c))}
+              color={theme.secondary}
+              gamut={theme.gamut}
+              onChange={(c) => attempt(() => withSecondary(theme, c))}
             />
             <Button
               size="sm"
               variant="ghost"
               className="justify-self-start"
-              onClick={() => attempt(() => withSecondary(brand, null))}
+              onClick={() => attempt(() => withSecondary(theme, null))}
             >
               Remove secondary
             </Button>
@@ -256,15 +256,15 @@ export function SeedRail({
 
       <Group
         title={
-          source === brand.primary || source === null
+          source === theme.primary || source === null
             ? "Harmony of the primary hue"
             : "Harmony of the secondary hue"
         }
       >
         <HarmonyPicker
-          value={brand.harmony}
+          value={theme.harmony}
           hue={source?.H ?? null}
-          onChange={(kind) => attempt(() => withHarmony(brand, kind))}
+          onChange={(kind) => attempt(() => withHarmony(theme, kind))}
         />
       </Group>
 

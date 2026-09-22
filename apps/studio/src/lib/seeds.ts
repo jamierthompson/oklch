@@ -1,4 +1,4 @@
-/** A few colors to start a brand from. Each is inside sRGB's safe chroma at its lightness, so `through` takes it as is. */
+/** A few colors to start a theme from. Each is inside sRGB's safe chroma at its lightness, so `through` takes it as is. */
 export const SEEDS = [
   { name: "Ocean", color: "#2563eb" },
   { name: "Forest", color: "#059669" },

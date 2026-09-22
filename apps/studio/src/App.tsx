@@ -1,11 +1,11 @@
-import { auditOf, newBrand, type Brand } from "@/lib/brand.ts";
+import { auditOf, newTheme, type Theme } from "@/lib/theme.ts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { BrandBar } from "@/components/BrandBar.tsx";
+import { ThemeBar } from "@/components/ThemeBar.tsx";
 import { ExportPanel } from "@/components/ExportPanel.tsx";
 import { PalettePanel } from "@/components/PalettePanel.tsx";
 import { SeedRail } from "@/components/SeedRail.tsx";
-import { StartBrand } from "@/components/StartBrand.tsx";
+import { StartTheme } from "@/components/StartTheme.tsx";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useBrands } from "@/hooks/useBrands.ts";
+import { useThemes } from "@/hooks/useThemes.ts";
 import { SEEDS } from "@/lib/seeds.ts";
 
 function useSystemScheme() {
@@ -42,28 +42,28 @@ function draftName(color: string): string {
 
 export function App() {
   useSystemScheme();
-  const studio = useBrands();
-  const { brand, isDraft, dirty, tryBrand } = studio;
-  const [pending, setPending] = useState<Brand | null>(null);
+  const studio = useThemes();
+  const { theme, isDraft, dirty, tryTheme } = studio;
+  const [pending, setPending] = useState<Theme | null>(null);
   const audit = useMemo(
-    () => (brand === null ? null : auditOf(brand)),
-    [brand],
+    () => (theme === null ? null : auditOf(theme)),
+    [theme],
   );
 
   /** Try a color: a draft, in memory. An edited draft asks before it is replaced. */
   const pick = useCallback(
     (color: string): string | null => {
-      let next: Brand;
+      let next: Theme;
       try {
-        next = newBrand(draftName(color), color, brand?.gamut ?? "srgb");
+        next = newTheme(draftName(color), color, theme?.gamut ?? "srgb");
       } catch (e) {
         return e instanceof Error ? e.message : String(e);
       }
       if (isDraft && dirty) setPending(next);
-      else tryBrand(next);
+      else tryTheme(next);
       return null;
     },
-    [brand?.gamut, isDraft, dirty, tryBrand],
+    [theme?.gamut, isDraft, dirty, tryTheme],
   );
 
   const failing =
@@ -76,9 +76,9 @@ export function App() {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background text-foreground">
-        <BrandBar
-          brands={studio.brands}
-          brand={brand}
+        <ThemeBar
+          themes={studio.themes}
+          theme={theme}
           draft={studio.draft}
           isDraft={isDraft}
           onPick={pick}
@@ -88,14 +88,14 @@ export function App() {
           onDuplicate={studio.duplicate}
           onRemove={studio.remove}
         />
-        {brand === null || audit === null ? (
+        {theme === null || audit === null ? (
           <main className="p-4">
-            <StartBrand onPick={pick} />
+            <StartTheme onPick={pick} />
           </main>
         ) : (
           <div className="grid gap-4 p-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
             <SeedRail
-              brand={brand}
+              theme={theme}
               onUpdate={studio.update}
               className="rounded-lg border px-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
             />
@@ -110,13 +110,13 @@ export function App() {
                 {/* Kept mounted so the selected step survives a look at Export. */}
                 <TabsContent value="palette" className="mt-3" keepMounted>
                   <PalettePanel
-                    brand={brand}
+                    theme={theme}
                     audit={audit}
                     onUpdate={studio.update}
                   />
                 </TabsContent>
                 <TabsContent value="export" className="mt-3">
-                  <ExportPanel brand={brand} audit={audit} />
+                  <ExportPanel theme={theme} audit={audit} />
                 </TabsContent>
               </Tabs>
             </main>
@@ -131,14 +131,14 @@ export function App() {
               <AlertDialogTitle>Replace the edited draft?</AlertDialogTitle>
               <AlertDialogDescription>
                 The current draft has steps you moved and is not saved. Trying
-                another color replaces it. Save it as a brand first to keep it.
+                another color replaces it. Save it as a theme first to keep it.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Keep editing</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
-                  if (pending !== null) tryBrand(pending);
+                  if (pending !== null) tryTheme(pending);
                   setPending(null);
                 }}
               >

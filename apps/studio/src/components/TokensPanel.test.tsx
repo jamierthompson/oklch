@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { TokensPanel } from "./TokensPanel.tsx";
-import { auditOf, newBrand, withOverride, type Brand } from "@/lib/brand.ts";
+import { auditOf, newTheme, withOverride, type Theme } from "@/lib/theme.ts";
 
-const acme = () => newBrand("Acme", "#2563eb", "srgb");
+const acme = () => newTheme("Acme", "#2563eb", "srgb");
 const rowOf = (token: string) =>
   screen
     .getAllByRole("row")
@@ -13,9 +13,9 @@ const rowOf = (token: string) =>
 
 describe("TokensPanel", () => {
   it("shows every token with a verdict in both schemes, on its role's ramp", () => {
-    const brand = acme();
+    const theme = acme();
     render(
-      <TokensPanel brand={brand} audit={auditOf(brand)} onUpdate={() => {}} />,
+      <TokensPanel theme={theme} audit={auditOf(theme)} onUpdate={() => {}} />,
     );
     expect(screen.getAllByRole("row")).toHaveLength(32);
     // The ramp is shown, not chosen: a token's ramp is its role's.
@@ -39,10 +39,10 @@ describe("TokensPanel", () => {
 
   it("shows a failing pick as failing, and Snap moves it to a step that clears", async () => {
     const failing = withOverride(acme(), "light", "primary", { step: 1 });
-    const onUpdate = vi.fn<(b: Brand) => void>();
+    const onUpdate = vi.fn<(b: Theme) => void>();
     render(
       <TokensPanel
-        brand={failing}
+        theme={failing}
         audit={auditOf(failing)}
         onUpdate={onUpdate}
       />,
@@ -64,10 +64,10 @@ describe("TokensPanel", () => {
 
   it("Reset drops the override", async () => {
     const picked = withOverride(acme(), "dark", "card", { step: 8 });
-    const onUpdate = vi.fn<(b: Brand) => void>();
+    const onUpdate = vi.fn<(b: Theme) => void>();
     render(
       <TokensPanel
-        brand={picked}
+        theme={picked}
         audit={auditOf(picked)}
         onUpdate={onUpdate}
       />,

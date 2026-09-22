@@ -1,6 +1,6 @@
 import { HARMONY_KINDS, type HarmonyKind } from "@jamiethompson/oklch";
 
-import { HARMONY_LABELS } from "@/lib/brand.ts";
+import { HARMONY_LABELS } from "@/lib/theme.ts";
 
 const R = 9;
 const C = 12;

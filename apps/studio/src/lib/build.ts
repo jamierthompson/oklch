@@ -5,7 +5,7 @@ import {
   type TokenSetAudit,
 } from "@jamiethompson/oklch";
 
-import { auditOf, type Brand } from "./brand.ts";
+import { auditOf, type Theme } from "./theme.ts";
 
 /** One file that ships: its name, contents, and media type. */
 export interface Output {
@@ -24,38 +24,38 @@ export interface Built {
   } | null;
 }
 
-/** A kebab-case name for files and the registry, from the brand's name. */
+/** A kebab-case name for files and the registry, from the theme's name. */
 export function slug(name: string): string {
   return (
     name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || "brand"
+      .replace(/^-|-$/g, "") || "theme"
   );
 }
 
 /**
- * Audit the brand and, when every token clears, the three files it ships
+ * Audit the theme and, when every token clears, the three files it ships
  * as: shadcn's CSS blocks, a `registry:theme` item, and DTCG tokens. When
  * any verdict is not `clears`, `outputs` is null and the audit says which.
  */
-export function buildBrand(brand: Brand): Built {
-  const audit = auditOf(brand);
+export function buildTheme(theme: Theme): Built {
+  const audit = auditOf(theme);
   if (audit.set === null) return { audit, outputs: null };
-  const name = slug(brand.name);
+  const name = slug(theme.name);
   return {
     audit,
     outputs: {
       css: {
         file: `${name}.css`,
-        text: tokenSetToShadcnCss(audit.set, { radius: brand.radius }),
+        text: tokenSetToShadcnCss(audit.set, { radius: theme.radius }),
         type: "text/css",
       },
       registry: {
         file: `${name}.registry.json`,
         text:
           JSON.stringify(
-            tokenSetToRegistryItem(audit.set, { name, title: brand.name }),
+            tokenSetToRegistryItem(audit.set, { name, title: theme.name }),
             null,
             2,
           ) + "\n",

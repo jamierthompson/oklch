@@ -4,12 +4,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PalettePanel } from "./PalettePanel.tsx";
 import { STOP_NAMES } from "@/lib/format.ts";
-import { auditOf, newBrand, withOverride, type Brand } from "@/lib/brand.ts";
+import { auditOf, newTheme, withOverride, type Theme } from "@/lib/theme.ts";
 
-const acme = () => newBrand("Acme", "#2563eb", "srgb");
-const panel = (brand: Brand, onUpdate = vi.fn<(b: Brand) => void>()) => {
+const acme = () => newTheme("Acme", "#2563eb", "srgb");
+const panel = (theme: Theme, onUpdate = vi.fn<(b: Theme) => void>()) => {
   render(
-    <PalettePanel brand={brand} audit={auditOf(brand)} onUpdate={onUpdate} />,
+    <PalettePanel theme={theme} audit={auditOf(theme)} onUpdate={onUpdate} />,
   );
   return onUpdate;
 };
@@ -96,12 +96,12 @@ describe("PalettePanel", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "show light primary on its ramp" }),
     );
-    const brand = ramp("primary");
-    expect(brand.getByRole("button", { name: "primary 800" })).toHaveAttribute(
+    const theme = ramp("primary");
+    expect(theme.getByRole("button", { name: "primary 800" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    const onStep = within(brand.getByLabelText("tokens on this step"));
+    const onStep = within(theme.getByLabelText("tokens on this step"));
     expect(onStep.getByText("light · primary")).toBeInTheDocument();
     expect(onStep.getByText(/on background · WCAG/)).toBeInTheDocument();
     // The cells on that step are marked.
@@ -116,12 +116,12 @@ describe("PalettePanel", () => {
   it("a step with a failing token is marked on the ramp, and the token says why", async () => {
     const failing = withOverride(acme(), "light", "primary", { step: 1 });
     panel(failing);
-    const brand = ramp("primary");
-    expect(brand.getByLabelText("1 token on primary 100")).toHaveClass(
+    const theme = ramp("primary");
+    expect(theme.getByLabelText("1 token on primary 100")).toHaveClass(
       "text-destructive",
     );
-    await userEvent.click(brand.getByRole("button", { name: "primary 100" }));
-    const onStep = within(brand.getByLabelText("tokens on this step"));
+    await userEvent.click(theme.getByRole("button", { name: "primary 100" }));
+    const onStep = within(theme.getByLabelText("tokens on this step"));
     expect(onStep.getByText("override")).toBeInTheDocument();
     expect(onStep.getByText(/^fails on background/)).toBeInTheDocument();
   });

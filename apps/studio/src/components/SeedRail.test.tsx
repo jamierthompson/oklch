@@ -4,19 +4,19 @@ import { describe, expect, it, vi } from "vitest";
 
 import { SeedRail } from "./SeedRail.tsx";
 import {
-  newBrand,
+  newTheme,
   withHarmony,
   withSecondary,
-  type Brand,
-} from "@/lib/brand.ts";
+  type Theme,
+} from "@/lib/theme.ts";
 
-const acme = () => newBrand("Acme", "#2563eb", "srgb");
-const rail = (brand: Brand) => {
-  const onUpdate = vi.fn<(b: Brand) => void>();
-  render(<SeedRail brand={brand} onUpdate={onUpdate} />);
+const acme = () => newTheme("Acme", "#2563eb", "srgb");
+const rail = (theme: Theme) => {
+  const onUpdate = vi.fn<(b: Theme) => void>();
+  render(<SeedRail theme={theme} onUpdate={onUpdate} />);
   return onUpdate;
 };
-const last = (f: ReturnType<typeof vi.fn<(b: Brand) => void>>) =>
+const last = (f: ReturnType<typeof vi.fn<(b: Theme) => void>>) =>
   f.mock.calls.at(-1)![0];
 
 describe("SeedRail", () => {
@@ -108,7 +108,7 @@ describe("SeedRail", () => {
   });
 
   it("notes an achromatic primary", () => {
-    rail(newBrand("Gray", "#808080", "srgb"));
+    rail(newTheme("Gray", "#808080", "srgb"));
     expect(screen.getByText(/The primary has no hue/)).toBeInTheDocument();
   });
 });

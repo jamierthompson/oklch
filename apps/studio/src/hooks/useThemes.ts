@@ -1,4 +1,4 @@
-import { newId, type Brand } from "@/lib/brand.ts";
+import { newId, type Theme } from "@/lib/theme.ts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { load, save, type Stored } from "@/lib/storage.ts";
@@ -7,31 +7,31 @@ import { load, save, type Stored } from "@/lib/storage.ts";
 export const DRAFT = "draft";
 
 /**
- * The brands on this machine, and at most one draft that is not.
+ * The themes on this machine, and at most one draft that is not.
  *
  * Trying a seed makes a draft: a whole palette, in memory only. It shows in
- * the switcher until it is saved as a brand or discarded, and nothing about
- * it reaches storage until then. Saved brands persist on every change.
+ * the switcher until it is saved as a theme or discarded, and nothing about
+ * it reaches storage until then. Saved themes persist on every change.
  */
-export function useBrands() {
+export function useThemes() {
   const [stored, setStored] = useState<Stored>(load);
   useEffect(() => save(stored), [stored]);
-  const [draft, setDraft] = useState<Brand | null>(null);
+  const [draft, setDraft] = useState<Theme | null>(null);
   const [onDraft, setOnDraft] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  const saved = useMemo<Brand | null>(
+  const saved = useMemo<Theme | null>(
     () =>
-      stored.brands.find((b) => b.id === stored.current) ??
-      stored.brands[0] ??
+      stored.themes.find((b) => b.id === stored.current) ??
+      stored.themes[0] ??
       null,
     [stored],
   );
   const isDraft = onDraft && draft !== null;
-  const brand = isDraft ? draft : saved;
+  const theme = isDraft ? draft : saved;
 
   const update = useCallback(
-    (next: Brand | ((b: Brand) => Brand)) => {
+    (next: Theme | ((b: Theme) => Theme)) => {
       if (isDraft) {
         setDraft((d) =>
           d === null ? d : typeof next === "function" ? next(d) : next,
@@ -40,19 +40,19 @@ export function useBrands() {
         return;
       }
       setStored((s) => {
-        const cur = s.brands.find((b) => b.id === s.current) ?? s.brands[0];
+        const cur = s.themes.find((b) => b.id === s.current) ?? s.themes[0];
         if (cur === undefined) return s;
         const replaced = typeof next === "function" ? next(cur) : next;
         return {
           ...s,
-          brands: s.brands.map((b) => (b.id === cur.id ? replaced : b)),
+          themes: s.themes.map((b) => (b.id === cur.id ? replaced : b)),
         };
       });
     },
     [isDraft],
   );
 
-  const tryBrand = useCallback((b: Brand) => {
+  const tryTheme = useCallback((b: Theme) => {
     setDraft(b);
     setOnDraft(true);
     setDirty(false);
@@ -60,7 +60,7 @@ export function useBrands() {
 
   const saveDraft = useCallback(() => {
     if (draft === null) return;
-    setStored((s) => ({ brands: [...s.brands, draft], current: draft.id }));
+    setStored((s) => ({ themes: [...s.themes, draft], current: draft.id }));
     setDraft(null);
     setOnDraft(false);
     setDirty(false);
@@ -82,11 +82,11 @@ export function useBrands() {
   }, []);
 
   const duplicate = useCallback(() => {
-    if (brand === null) return;
-    const copy = { ...brand, id: newId(), name: `${brand.name} copy` };
+    if (theme === null) return;
+    const copy = { ...theme, id: newId(), name: `${theme.name} copy` };
     setOnDraft(false);
-    setStored((s) => ({ brands: [...s.brands, copy], current: copy.id }));
-  }, [brand]);
+    setStored((s) => ({ themes: [...s.themes, copy], current: copy.id }));
+  }, [theme]);
 
   const remove = useCallback(() => {
     if (isDraft) {
@@ -94,18 +94,18 @@ export function useBrands() {
       return;
     }
     setStored((s) => {
-      const rest = s.brands.filter((b) => b.id !== s.current);
-      return { brands: rest, current: rest[0]?.id ?? null };
+      const rest = s.themes.filter((b) => b.id !== s.current);
+      return { themes: rest, current: rest[0]?.id ?? null };
     });
   }, [isDraft, discardDraft]);
 
   return {
-    brands: stored.brands,
-    brand,
+    themes: stored.themes,
+    theme,
     draft,
     isDraft,
     dirty,
-    tryBrand,
+    tryTheme,
     saveDraft,
     discardDraft,
     update,

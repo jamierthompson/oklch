@@ -1,6 +1,6 @@
 import { formatHex } from "@jamiethompson/oklch";
 
-import { withGamut, type Brand } from "@/lib/brand.ts";
+import { withGamut, type Theme } from "@/lib/theme.ts";
 
 import { SeedPicker } from "@/components/SeedPicker.tsx";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DRAFT } from "@/hooks/useBrands.ts";
+import { DRAFT } from "@/hooks/useThemes.ts";
 
-export function BrandBar({
-  brands,
-  brand,
+export function ThemeBar({
+  themes,
+  theme,
   draft,
   isDraft,
   onPick,
@@ -28,23 +28,23 @@ export function BrandBar({
   onDuplicate,
   onRemove,
 }: {
-  brands: readonly Brand[];
-  brand: Brand | null;
-  draft: Brand | null;
+  themes: readonly Theme[];
+  theme: Theme | null;
+  draft: Theme | null;
   isDraft: boolean;
   onPick: (color: string) => string | null;
   onSelect: (id: string) => void;
-  onUpdate: (b: Brand) => void;
+  onUpdate: (b: Theme) => void;
   onSave: () => void;
   onDuplicate: () => void;
   onRemove: () => void;
 }) {
-  if (brand === null) {
+  if (theme === null) {
     return (
       <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
         <h1 className="font-semibold">oklch studio</h1>
         <span className="text-sm text-muted-foreground">
-          No brands on this machine yet.
+          No themes on this machine yet.
         </span>
       </header>
     );
@@ -52,9 +52,9 @@ export function BrandBar({
 
   const items: Record<string, string> = {
     ...(draft === null ? {} : { [DRAFT]: `Draft · ${draft.name}` }),
-    ...Object.fromEntries(brands.map((b) => [b.id, b.name])),
+    ...Object.fromEntries(themes.map((b) => [b.id, b.name])),
   };
-  const current = formatHex(brand.primary).hex;
+  const current = formatHex(theme.primary).hex;
 
   return (
     <header className="grid gap-3 border-b px-4 py-3">
@@ -65,18 +65,18 @@ export function BrandBar({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Select
-          value={isDraft ? DRAFT : brand.id}
+          value={isDraft ? DRAFT : theme.id}
           onValueChange={(v) => v !== null && onSelect(v)}
           items={items}
         >
-          <SelectTrigger aria-label="Brand" className="w-48">
+          <SelectTrigger aria-label="Theme" className="w-48">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {draft !== null && (
               <SelectItem value={DRAFT}>Draft · {draft.name}</SelectItem>
             )}
-            {brands.map((b) => (
+            {themes.map((b) => (
               <SelectItem key={b.id} value={b.id}>
                 {b.name}
               </SelectItem>
@@ -84,15 +84,15 @@ export function BrandBar({
           </SelectContent>
         </Select>
         <Input
-          aria-label="Brand name"
+          aria-label="Theme name"
           className="w-40"
-          value={brand.name}
-          onChange={(e) => onUpdate({ ...brand, name: e.target.value })}
+          value={theme.name}
+          onChange={(e) => onUpdate({ ...theme, name: e.target.value })}
         />
         <Select
-          value={brand.gamut}
+          value={theme.gamut}
           onValueChange={(v) =>
-            v !== null && onUpdate(withGamut(brand, v as Brand["gamut"]))
+            v !== null && onUpdate(withGamut(theme, v as Theme["gamut"]))
           }
         >
           <SelectTrigger aria-label="Gamut" className="w-24">
@@ -106,8 +106,8 @@ export function BrandBar({
         {isDraft ? (
           <>
             <Badge variant="outline">Draft · not saved</Badge>
-            <Button onClick={onSave} disabled={brand.name.trim() === ""}>
-              Save brand
+            <Button onClick={onSave} disabled={theme.name.trim() === ""}>
+              Save theme
             </Button>
           </>
         ) : (

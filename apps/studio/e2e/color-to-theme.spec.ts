@@ -1,20 +1,20 @@
 import { expect, test } from "@playwright/test";
 
-/** The primary flow: a color tried, a brand saved, a passing shadcn theme out. */
-test("a brand color becomes a shadcn theme with every token clearing", async ({
+/** The primary flow: a color tried, a theme saved, a passing shadcn theme out. */
+test("a theme from a color ships with every token clearing", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByText("No brand yet")).toBeVisible();
+  await expect(page.getByText("No theme yet")).toBeVisible();
 
   await page.getByLabel("Or your own color").fill("#f59e0b");
   await page.getByRole("button", { name: "Try" }).click();
   await expect(page.getByText("Draft · not saved")).toBeVisible();
 
-  await page.getByLabel("Brand name").fill("Amber Co");
-  await page.getByRole("button", { name: "Save brand" }).click();
+  await page.getByLabel("Theme name").fill("Amber Co");
+  await page.getByRole("button", { name: "Save theme" }).click();
   await expect(page.getByText("Draft · not saved")).toHaveCount(0);
-  await expect(page.getByLabel("Brand name")).toHaveValue("Amber Co");
+  await expect(page.getByLabel("Theme name")).toHaveValue("Amber Co");
 
   await page.getByRole("tab", { name: "Palette" }).click();
   await expect(page.getByRole("tab", { name: "Palette" })).not.toContainText(

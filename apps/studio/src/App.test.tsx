@@ -3,118 +3,172 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { App } from "./App.tsx";
-import { SEEDS } from "@/lib/seeds.ts";
+import { PRESETS } from "@/lib/presets.ts";
 
-const storedNames = () =>
-  (
-    JSON.parse(localStorage.getItem("oklch-studio/themes")!) as {
-      themes: { name: string }[];
-    }
-  ).themes.map((b) => b.name);
+const stored = () =>
+  JSON.parse(localStorage.getItem("oklch-studio/themes")!) as {
+    themes: { name: string }[];
+    log: unknown[];
+    cursor: number;
+  };
+const sidebar = () =>
+  within(screen.getByRole("navigation", { name: "Theme list" }));
+/** The sidebar's theme names, top to bottom. */
+const rows = () =>
+  sidebar()
+    .getAllByRole("listitem")
+    .map((li) => li.querySelector("[data-sidebar=menu-button]")!.textContent);
+const header = () => within(screen.getByRole("banner"));
+const name = () => screen.getByLabelText("Theme name");
+const menu = async (theme: string, item: string) => {
+  await userEvent.click(
+    sidebar().getByRole("button", { name: `${theme} actions` }),
+  );
+  await userEvent.click(await screen.findByRole("menuitem", { name: item }));
+};
 
 describe("App", () => {
   beforeEach(() => localStorage.clear());
 
-  it("opens empty, with the seed colors and nothing created", () => {
+  it("opens on the presets, each a theme, with the first selected and stored", () => {
     render(<App />);
-    expect(screen.getByText("No theme yet")).toBeInTheDocument();
-    for (const s of SEEDS)
-      expect(screen.getByRole("button", { name: s.name })).toBeInTheDocument();
-    expect(screen.queryByTestId("preview-light")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Seeds")).not.toBeInTheDocument();
-    expect(storedNames()).toEqual([]);
+    // One read of the list, not a role query per preset: each walks the whole tree.
+    expect(rows()).toEqual(PRESETS.map((t) => t.name));
+    expect(name()).toHaveValue(PRESETS[0]!.name);
+    expect(screen.getByTestId("preview-light")).toBeInTheDocument();
+    expect(stored().themes).toHaveLength(32);
+    expect(stored().log).toEqual([]);
+    expect(header().getByRole("button", { name: "Undo" })).toBeDisabled();
   });
 
-  it("trying a seed drafts a whole palette in memory, and stores nothing", async () => {
+  it("selecting a preset in the sidebar shows it", async () => {
     render(<App />);
-    await userEvent.click(screen.getByRole("button", { name: "Forest" }));
-    expect(screen.getByText("Draft · not saved")).toBeInTheDocument();
-    expect(screen.getByLabelText("Theme name")).toHaveValue("Forest");
-    const light = screen.getByTestId("preview-light");
-    const dark = screen.getByTestId("preview-dark");
-    expect(light.style.getPropertyValue("--primary")).toMatch(/^oklch\(/);
-    expect(dark).toHaveClass("dark");
-    expect(storedNames()).toEqual([]);
-    // The rail shows the seed the draft was drawn through.
-    const rail = within(screen.getByLabelText("Seeds"));
-    expect(rail.getByLabelText("Primary color")).toHaveValue(
-      SEEDS.find((s) => s.name === "Forest")!.color,
+    await userEvent.click(
+      sidebar().getByRole("button", { name: "Kansas City Chiefs" }),
     );
-    expect(rail.getByRole("button", { name: "Analogous" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    // The seeds stay in the header, and the one the draft came from is marked.
-    expect(screen.getByRole("button", { name: "Forest" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByRole("button", { name: "Ocean" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-  });
-
-  it("trying another seed replaces an untouched draft without asking", async () => {
-    render(<App />);
-    await userEvent.click(screen.getByRole("button", { name: "Forest" }));
-    await userEvent.click(screen.getByRole("button", { name: "Coral" }));
-    expect(screen.getByLabelText("Theme name")).toHaveValue("Coral");
+    expect(name()).toHaveValue("Kansas City Chiefs");
     expect(
-      screen.queryByText("Replace the edited draft?"),
+      within(screen.getByLabelText("Seeds")).getByLabelText("Primary color"),
+    ).toHaveValue("#e31837");
+  });
+
+  it("a rename is applied at once, stored, and undone in one click, then redone", async () => {
+    render(<App />);
+    await userEvent.type(name(), " FC");
+    expect(name()).toHaveValue(`${PRESETS[0]!.name} FC`);
+    expect(stored().themes[0]!.name).toBe(`${PRESETS[0]!.name} FC`);
+    expect(stored().log).toHaveLength(1);
+    await userEvent.click(header().getByRole("button", { name: "Undo" }));
+    expect(name()).toHaveValue(PRESETS[0]!.name);
+    expect(header().getByRole("button", { name: "Undo" })).toBeDisabled();
+    await userEvent.click(header().getByRole("button", { name: "Redo" }));
+    expect(name()).toHaveValue(`${PRESETS[0]!.name} FC`);
+  });
+
+  it("+ adds a random theme at the top, selected; deleting needs no confirmation and undoes", async () => {
+    render(<App />);
+    await userEvent.click(screen.getByRole("button", { name: "Add theme" }));
+    const added = rows()[0]!;
+    expect(added).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
+    expect(name()).toHaveValue(added);
+    expect(stored().themes).toHaveLength(33);
+    expect(
+      within(screen.getByLabelText("Seeds")).getByLabelText("Secondary color"),
+    ).toBeInTheDocument();
+
+    await menu(added, "Delete");
+    expect(
+      sidebar().queryByRole("button", { name: added }),
     ).not.toBeInTheDocument();
-    expect(storedNames()).toEqual([]);
+    expect(stored().themes).toHaveLength(32);
+    await userEvent.click(header().getByRole("button", { name: "Undo" }));
+    expect(rows()[0]).toBe(added);
+    expect(name()).toHaveValue(added);
   });
 
-  it("asks before replacing a draft that was edited", async () => {
+  it("a preset is deleted like any theme, and undo brings it back", async () => {
     render(<App />);
-    await userEvent.click(screen.getByRole("button", { name: "Forest" }));
-    await userEvent.type(screen.getByLabelText("Theme name"), " Co");
-    await userEvent.click(screen.getByRole("button", { name: "Coral" }));
-    expect(
-      await screen.findByText("Replace the edited draft?"),
-    ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Keep editing" }));
-    expect(screen.getByLabelText("Theme name")).toHaveValue("Forest Co");
-    await userEvent.click(screen.getByRole("button", { name: "Coral" }));
+    const first = PRESETS[0]!.name;
+    await menu(first, "Delete");
+    expect(name()).toHaveValue(PRESETS[1]!.name);
+    expect(stored().themes).toHaveLength(31);
+    await userEvent.click(header().getByRole("button", { name: "Undo" }));
+    expect(rows()[0]).toBe(first);
+    expect(name()).toHaveValue(first);
+  });
+
+  it("duplicate lands below the original, and the activity table undoes to here", async () => {
+    render(<App />);
+    await menu(PRESETS[0]!.name, "Duplicate");
+    expect(name()).toHaveValue(`${PRESETS[0]!.name} copy`);
+    expect(rows().slice(0, 2)).toEqual([
+      PRESETS[0]!.name,
+      `${PRESETS[0]!.name} copy`,
+    ]);
+    await userEvent.type(name(), "!");
+
+    await userEvent.click(header().getByRole("button", { name: "Activity" }));
+    const feed = within(await screen.findByRole("dialog"));
+    const items = feed.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(within(items[0]!).getByText("Renamed")).toBeInTheDocument();
+    expect(within(items[1]!).getByText("Created")).toBeInTheDocument();
+    // Undo to the creation: the rename goes with it, and both stay, undone.
     await userEvent.click(
-      await screen.findByRole("button", { name: "Replace draft" }),
+      within(items[1]!).getByRole("button", { name: /^Undo to here/ }),
     );
-    expect(screen.getByLabelText("Theme name")).toHaveValue("Coral");
-  });
-
-  it("saving the draft is what stores a theme; discarding returns to empty", async () => {
-    render(<App />);
-    await userEvent.click(screen.getByRole("button", { name: "Ocean" }));
-    await userEvent.clear(screen.getByLabelText("Theme name"));
-    await userEvent.type(screen.getByLabelText("Theme name"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Save theme" }));
-    expect(storedNames()).toEqual(["Acme"]);
-    expect(screen.queryByText("Draft · not saved")).not.toBeInTheDocument();
-    // The preview has a Delete button of its own; the header's is the one that acts.
-    const header = () => within(screen.getByRole("banner"));
-    expect(
-      header().getByRole("button", { name: "Delete" }),
-    ).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Plum" }));
-    expect(screen.getByText("Draft · not saved")).toBeInTheDocument();
-    expect(storedNames()).toEqual(["Acme"]);
+    expect(feed.getAllByRole("listitem")).toHaveLength(2);
+    expect(feed.getByRole("region", { name: "undone" })).toBeInTheDocument();
+    expect(feed.getAllByRole("button", { name: /^Redo to here/ })).toHaveLength(
+      2,
+    );
+    // The filter narrows to a theme, as a chip that can be removed.
+    await userEvent.click(feed.getByRole("button", { name: "Filter" }));
+    // Both entries are the copy's; with its creation undone, it goes by the name the log last saw.
+    const copy = `${PRESETS[0]!.name} copy`;
     await userEvent.click(
-      screen.getByRole("button", { name: "Discard draft" }),
+      await screen.findByRole("menuitemcheckbox", { name: copy }),
     );
-    expect(screen.getByLabelText("Theme name")).toHaveValue("Acme");
-
-    await userEvent.click(header().getByRole("button", { name: "Delete" }));
-    expect(screen.getByText("No theme yet")).toBeInTheDocument();
-    expect(storedNames()).toEqual([]);
+    await userEvent.keyboard("{Escape}");
+    expect(feed.getAllByRole("listitem")).toHaveLength(2);
+    expect(
+      feed.getAllByText(copy, { selector: "span" }).length,
+    ).toBeGreaterThan(0);
+    await userEvent.click(
+      feed.getByRole("button", { name: `Remove filter ${copy}` }),
+    );
+    expect(feed.getAllByRole("listitem")).toHaveLength(2);
+    await userEvent.keyboard("{Escape}");
+    expect(
+      sidebar().queryByRole("button", { name: /copy/ }),
+    ).not.toBeInTheDocument();
+    expect(name()).toHaveValue(PRESETS[0]!.name);
   });
 
-  it("explains a color that is not one, and stays empty", async () => {
+  it("the undo button bounces on a change until undo is used once", async () => {
     render(<App />);
-    await userEvent.type(screen.getByLabelText("Or your own color"), "blueish");
-    await userEvent.click(screen.getByRole("button", { name: "Try" }));
-    expect(screen.getByText(/"blueish" is not a color/)).toBeInTheDocument();
-    expect(screen.getByText("No theme yet")).toBeInTheDocument();
+    const undo = () => header().getByRole("button", { name: "Undo" });
+    expect(undo()).not.toHaveClass("motion-safe:animate-nudge");
+    await userEvent.type(name(), "!");
+    expect(undo()).toHaveClass("motion-safe:animate-nudge");
+    await userEvent.click(undo());
+    expect(localStorage.getItem("oklch-studio/knows-undo")).toBe("true");
+    await userEvent.type(name(), "?");
+    expect(undo()).not.toHaveClass("motion-safe:animate-nudge");
+  });
+
+  it("⌘Z undoes outside a field", async () => {
+    render(<App />);
+    await userEvent.click(
+      within(screen.getByRole("region", { name: "ramp red" })).getByRole(
+        "button",
+        {
+          name: "chart-2 role on red",
+        },
+      ),
+    );
+    expect(stored().log).toHaveLength(1);
+    await userEvent.keyboard("{Meta>}z{/Meta}");
+    expect(stored().cursor).toBe(0);
   });
 });

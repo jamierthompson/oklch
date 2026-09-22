@@ -1,4 +1,8 @@
-import { SHADCN_TOKENS, TAILWIND_STOPS } from "@jamiethompson/oklch";
+import {
+  HARMONY_KINDS,
+  SHADCN_TOKENS,
+  TAILWIND_STOPS,
+} from "@jamiethompson/oklch";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +11,7 @@ import {
   cssVarsOf,
   newTheme,
   parse,
+  randomTheme,
   rampOf,
   rolesOf,
   serialize,
@@ -129,6 +134,7 @@ describe("the seed step", () => {
     expect(() => withHarmony(moved, "triadic")).not.toThrow();
   });
 });
+
 describe("seeds", () => {
   it("a new primary redraws the primary, the neutral tint and the harmonies, and keeps the eye's steps elsewhere", () => {
     const moved = withStep(withSecondary(acme(), amber), "secondary", 5, {
@@ -247,6 +253,29 @@ describe("cssVarsOf", () => {
     expect(vars["--radius"]).toBe("0.5rem");
     expect(Object.keys(vars)).toHaveLength(SHADCN_TOKENS.length + 1);
     expect(vars["--background"]).toMatch(/^oklch\(0\.145 /);
+  });
+});
+
+describe("randomTheme", () => {
+  it("has a primary, a secondary, a harmony, and ramps drafted from them, and clears", () => {
+    let n = 0;
+    // A fixed sequence stands in for Math.random, so the test is the same every run.
+    const random = () => (n = (n * 9301 + 49297) % 233280) / 233280;
+    for (let i = 0; i < 10; i++) {
+      const t = randomTheme("Red Zone", random);
+      expect(t.name).toBe("Red Zone");
+      expect(t.secondary).not.toBeNull();
+      expect(names(t)).toContain("secondary");
+      expect(names(t).filter((r) => r.startsWith("harmony-")).length).toBe(
+        HARMONY_KINDS[t.harmony].length,
+      );
+      const audit = auditOf(t);
+      expect(
+        [...audit.light, ...audit.dark].filter(
+          (a) => a.outcome.kind !== "clears",
+        ),
+      ).toEqual([]);
+    }
   });
 });
 

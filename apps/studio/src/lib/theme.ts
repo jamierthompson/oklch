@@ -238,6 +238,51 @@ export function newTheme(name: string, seed: string, gamut: Gamut): Theme {
   };
 }
 
+/**
+ * A theme with a random primary, secondary, and harmony. Each seed has a
+ * random hue and a lightness in the middle of the range, with most of the
+ * chroma the gamut allows there.
+ */
+export function randomTheme(
+  name: string,
+  random: () => number = Math.random,
+): Theme {
+  const gamut = "srgb";
+  const seed = (): OkLCH => {
+    const L = 0.45 + random() * 0.3;
+    const H = random() * 360;
+    return safeSeed(
+      { L, C: maxChroma(L, H, gamut) * (0.6 + random() * 0.35), H },
+      gamut,
+    );
+  };
+  const kinds = Object.keys(HARMONY_KINDS) as HarmonyKind[];
+  const seeds = {
+    primary: seed(),
+    secondary: seed(),
+    harmony: kinds[Math.floor(random() * kinds.length)]!,
+    gamut,
+  } as const;
+  return {
+    id: newId(),
+    name,
+    radius: "0.625rem",
+    ...seeds,
+    ramps: draftRamps(seeds),
+    assignment: {},
+    overrides: { light: {}, dark: {} },
+  };
+}
+
+/** The three swatches a theme is known by in a list: its primary, the secondary's tint, and the first accent. */
+export function swatchesOf(theme: Theme): [OkLCH, OkLCH, OkLCH] {
+  const step = (name: string, i: number): OkLCH | undefined =>
+    theme.ramps.find((r) => r.name === name)?.steps[i];
+  const at = (role: Role, i: number): OkLCH =>
+    step(rampOf(theme, role), i) ?? theme.primary;
+  return [theme.primary, at("secondary", 1), at("accent", 5)];
+}
+
 export function rampsOf(theme: Theme): Ramp[] {
   return theme.ramps.map((r) => ({ name: r.name, steps: r.steps }));
 }

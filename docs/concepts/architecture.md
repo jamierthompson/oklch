@@ -18,7 +18,7 @@ more; every verdict is a report with its standard named. Nothing here signs off.
 solvers, hue, format. This is the whole package today.
 
 **Tier 2 — a list of steps.** `createRamp` drafts one: a hue through Tailwind's
-stops, or a ramp drawn through a brand color so that color is a step exactly,
+stops, or a ramp drawn through a seed color so that color is a step exactly,
 chroma a fixed share of what the gamut allows at each step. What comes out is
 steps, indistinguishable from placed ones. `inspectRamp` measures a ramp — drafted
 or placed. `minPass` finds the first step that clears a surface. `createScale`
@@ -30,7 +30,7 @@ fails if they import anything else.
 steps an eye placed to semantic roles, in a light and a dark scheme, with a
 receipt per pairing per scheme. `shadcnBindings` is the one preset: shadcn/ui's
 variables bound to a neutral, a primary, and a destructive ramp, surfaces picked
-and inks solved, so it clears out of the box for any brand hue and every step is
+and inks solved, so it clears out of the box for any primary hue and every step is
 still the eye's to move. `auditTokenSet` is the editor's view of the same walk: a
 verdict per token — clears, fails with the check attached, or unresolved by
 name — with the refusal recorded instead of thrown. The exporters ship the set

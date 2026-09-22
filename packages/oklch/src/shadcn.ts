@@ -68,7 +68,7 @@ export interface StepRef {
 export interface ShadcnAssignment {
   /** Surfaces, text, borders: the tinted gray. */
   readonly neutral: string;
-  /** Buttons, links, the brand. */
+  /** Buttons, links, the main color. */
   readonly primary: string;
   /** Errors and destructive actions. Usually a red. */
   readonly destructive: string;
@@ -180,7 +180,7 @@ export function shadcnBindings(
     const raised = light ? 0 : 9;
     const subtle = light ? 1 : 8;
     const hairline = light ? 2 : 8;
-    const brand = light ? 8 : 2;
+    const accentStep = light ? 8 : 2;
     const alert = light ? 6 : 4;
     const far = light ? "end" : "start";
     const near = light ? "start" : "end";
@@ -216,7 +216,7 @@ export function shadcnBindings(
       ink("card-foreground", "card"),
       surface("popover", neutral, raised),
       ink("popover-foreground", "popover"),
-      element("primary", primary, brand, "background"),
+      element("primary", primary, accentStep, "background"),
       ink("primary-foreground", "primary", near),
       surface("secondary", secondary, subtle),
       ink("secondary-foreground", "secondary"),
@@ -231,7 +231,7 @@ export function shadcnBindings(
       ...charts[s].map((c, i) => surface(`chart-${i + 1}`, c.ramp, c.step)),
       surface("sidebar", sidebar, light ? 1 : 9),
       ink("sidebar-foreground", "sidebar"),
-      element("sidebar-primary", primary, brand, "sidebar"),
+      element("sidebar-primary", primary, accentStep, "sidebar"),
       ink("sidebar-primary-foreground", "sidebar-primary", near),
       surface("sidebar-accent", accent, light ? 2 : 8),
       ink("sidebar-accent-foreground", "sidebar-accent"),

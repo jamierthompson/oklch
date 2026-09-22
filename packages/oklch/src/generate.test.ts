@@ -68,11 +68,11 @@ describe("createRamp", () => {
       expect(step.C).toBe(0);
   });
 
-  describe("through a brand color", () => {
-    const brand = { L: 0.55, C: 0.18, H: 30 };
+  describe("through a seed color", () => {
+    const seed = { L: 0.55, C: 0.18, H: 30 };
 
-    it("places the brand color on the nearest stop, exactly", () => {
-      const ramp = createRamp({ through: brand, gamut: "srgb" });
+    it("places the seed color on the nearest stop, exactly", () => {
+      const ramp = createRamp({ through: seed, gamut: "srgb" });
       expect(ramp.through).not.toBeNull();
       const { index, color } = ramp.through!;
       // 0.55 is nearest Tailwind's 600 stop (0.56).
@@ -85,8 +85,8 @@ describe("createRamp", () => {
       );
     });
 
-    it("derives the ramp's hue and saturation from the brand color", () => {
-      const ramp = createRamp({ through: brand, gamut: "srgb" });
+    it("derives the ramp's hue and saturation from the seed color", () => {
+      const ramp = createRamp({ through: seed, gamut: "srgb" });
       expect(ramp.hue).toBe(30);
       expect(ramp.saturation).toBeCloseTo(
         0.18 / maxChroma(0.55, 30, "srgb"),
@@ -101,14 +101,14 @@ describe("createRamp", () => {
       }
     });
 
-    it("keeps the brand hue at the anchor when the hue drifts", () => {
-      const ramp = createRamp({ through: brand, hueShift: 40, gamut: "srgb" });
+    it("keeps the seed hue at the anchor when the hue drifts", () => {
+      const ramp = createRamp({ through: seed, hueShift: 40, gamut: "srgb" });
       expect(ramp.steps[ramp.through!.index]!.H).toBe(30);
       expect(ramp.steps[0]!.H).toBeLessThan(30);
       expect(ramp.steps[10]!.H).toBeGreaterThan(30);
     });
 
-    it("refuses a brand color beyond the safe chroma, naming the map as the tool", () => {
+    it("refuses a seed color beyond the safe chroma, naming the map as the tool", () => {
       expect(() =>
         createRamp({ through: { L: 0.55, C: 0.4, H: 30 }, gamut: "srgb" }),
       ).toThrow(
@@ -116,7 +116,7 @@ describe("createRamp", () => {
       );
     });
 
-    it("refuses a brand color that is not one", () => {
+    it("refuses a seed color that is not one", () => {
       expect(() =>
         createRamp({ through: { L: 0.5, C: -0.1, H: 30 }, gamut: "srgb" }),
       ).toThrow(/^createRamp: through chroma -0.1 is negative/);
@@ -131,7 +131,7 @@ describe("createRamp", () => {
     it("refuses through together with a hue, and neither", () => {
       expect(() =>
         // @ts-expect-error the contract under test
-        createRamp({ ...BLUE, through: brand }),
+        createRamp({ ...BLUE, through: seed }),
       ).toThrow(/^createRamp: both `hue`\/`saturation` and `through`/);
       // @ts-expect-error the contract under test
       expect(() => createRamp({ gamut: "srgb" })).toThrow(

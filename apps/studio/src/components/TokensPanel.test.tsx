@@ -3,7 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { TokensPanel } from "./TokensPanel.tsx";
-import { auditOf, newTheme, withOverride, type Theme } from "@/lib/theme.ts";
+import {
+  auditOf,
+  newTheme,
+  withOverride,
+  type Override,
+  type Scheme,
+} from "@/lib/theme.ts";
+
+type OnOverride = (scheme: Scheme, token: string, o: Override | null) => void;
 
 const acme = () => newTheme("Acme", "#2563eb", "srgb");
 const rowOf = (token: string) =>
@@ -15,7 +23,11 @@ describe("TokensPanel", () => {
   it("shows every token with a verdict in both schemes, on its role's ramp", () => {
     const theme = acme();
     render(
-      <TokensPanel theme={theme} audit={auditOf(theme)} onUpdate={() => {}} />,
+      <TokensPanel
+        theme={theme}
+        audit={auditOf(theme)}
+        onOverride={() => {}}
+      />,
     );
     expect(screen.getAllByRole("row")).toHaveLength(32);
     // The ramp is shown, not chosen: a token's ramp is its role's.
@@ -39,12 +51,12 @@ describe("TokensPanel", () => {
 
   it("shows a failing pick as failing, and Snap moves it to a step that clears", async () => {
     const failing = withOverride(acme(), "light", "primary", { step: 1 });
-    const onUpdate = vi.fn<(b: Theme) => void>();
+    const onOverride = vi.fn<OnOverride>();
     render(
       <TokensPanel
         theme={failing}
         audit={auditOf(failing)}
-        onUpdate={onUpdate}
+        onOverride={onOverride}
       />,
     );
     const primary = rowOf("primary");
@@ -52,11 +64,11 @@ describe("TokensPanel", () => {
     await userEvent.click(
       within(primary).getByRole("button", { name: "Snap" }),
     );
-    expect(onUpdate).toHaveBeenCalledTimes(1);
-    const next = onUpdate.mock.calls[0]![0];
-    expect(next.overrides.light["primary"]).toEqual({
-      step: expect.any(Number),
-    });
+    expect(onOverride).toHaveBeenCalledTimes(1);
+    const [scheme, token, snapped] = onOverride.mock.calls[0]!;
+    expect([scheme, token]).toEqual(["light", "primary"]);
+    expect(snapped).toEqual({ step: expect.any(Number) });
+    const next = withOverride(failing, scheme, token, snapped);
     expect(
       auditOf(next).light.find((a) => a.token === "primary")!.outcome.kind,
     ).toBe("clears");
@@ -64,17 +76,17 @@ describe("TokensPanel", () => {
 
   it("Reset drops the override", async () => {
     const picked = withOverride(acme(), "dark", "card", { step: 8 });
-    const onUpdate = vi.fn<(b: Theme) => void>();
+    const onOverride = vi.fn<OnOverride>();
     render(
       <TokensPanel
         theme={picked}
         audit={auditOf(picked)}
-        onUpdate={onUpdate}
+        onOverride={onOverride}
       />,
     );
     await userEvent.click(
       within(rowOf("card")).getByRole("button", { name: "Reset" }),
     );
-    expect(onUpdate.mock.calls[0]![0].overrides.dark).toEqual({});
+    expect(onOverride).toHaveBeenCalledWith("dark", "card", null);
   });
 });

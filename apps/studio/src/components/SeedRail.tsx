@@ -15,10 +15,8 @@ import {
   isChromatic,
   safeSeed,
   SEED_L,
-  withHarmony,
-  withPrimary,
-  withSecondary,
   type Theme,
+  type HarmonyKind,
 } from "@/lib/theme.ts";
 
 const L_MIN = SEED_L.min;
@@ -148,37 +146,55 @@ function notesOf(theme: Theme): string[] {
   return notes;
 }
 
+/** The primary ramp as it stands, live, so a seed can be dragged with its effect in view even from a drawer. */
+function Strip({ theme }: { theme: Theme }) {
+  const primary = theme.ramps.find((r) => r.name === "primary");
+  if (primary === undefined) return null;
+  return (
+    <div
+      className="flex gap-px overflow-hidden rounded-md border"
+      aria-label="primary ramp"
+      role="img"
+    >
+      {primary.steps.map((s, i) => (
+        <span
+          key={i}
+          className="h-4 flex-1"
+          style={{ background: formatOklch(s) }}
+        />
+      ))}
+    </div>
+  );
+}
+
 /**
  * The rail: the two seeds and the harmony the ramps are drafted from.
  * Every change here redraws the ramps it touches and leaves the eye's
  * steps on the others; the ramps themselves are edited in the palette.
+ * Each callback answers with a message when the change is refused.
  */
 export function SeedRail({
   theme,
-  onUpdate,
+  onPrimary,
+  onSecondary,
+  onHarmony,
   className = "",
 }: {
   theme: Theme;
-  onUpdate: (b: Theme) => void;
+  onPrimary: (c: OkLCH) => string | null;
+  onSecondary: (c: OkLCH | null) => string | null;
+  onHarmony: (k: HarmonyKind) => string | null;
   className?: string;
 }) {
   const [secondaryText, setSecondaryText] = useState("");
   const [secondaryError, setSecondaryError] = useState<string | null>(null);
-  const attempt = (f: () => Theme): string | null => {
-    try {
-      onUpdate(f());
-      return null;
-    } catch (e) {
-      return e instanceof Error ? e.message : String(e);
-    }
-  };
   const addSecondary = () => {
     const parsed = parseColor(secondaryText.trim());
     if (parsed === null) {
       setSecondaryError(`"${secondaryText.trim()}" is not a color`);
       return;
     }
-    const error = attempt(() => withSecondary(theme, parsed));
+    const error = onSecondary(parsed);
     setSecondaryError(error);
     if (error === null) setSecondaryText("");
   };
@@ -187,12 +203,15 @@ export function SeedRail({
 
   return (
     <aside className={`grid content-start ${className}`} aria-label="Seeds">
+      <div className="pt-3">
+        <Strip theme={theme} />
+      </div>
       <Group title="Primary seed">
         <SeedEditor
           label="Primary"
           color={theme.primary}
           gamut={theme.gamut}
-          onChange={(c) => attempt(() => withPrimary(theme, c))}
+          onChange={onPrimary}
         />
       </Group>
 
@@ -230,13 +249,13 @@ export function SeedRail({
               label="Secondary"
               color={theme.secondary}
               gamut={theme.gamut}
-              onChange={(c) => attempt(() => withSecondary(theme, c))}
+              onChange={onSecondary}
             />
             <Button
               size="sm"
               variant="ghost"
               className="justify-self-start"
-              onClick={() => attempt(() => withSecondary(theme, null))}
+              onClick={() => onSecondary(null)}
             >
               Remove secondary
             </Button>
@@ -254,7 +273,7 @@ export function SeedRail({
         <HarmonyPicker
           value={theme.harmony}
           hue={source?.H ?? null}
-          onChange={(kind) => attempt(() => withHarmony(theme, kind))}
+          onChange={(kind) => onHarmony(kind)}
         />
       </Group>
 

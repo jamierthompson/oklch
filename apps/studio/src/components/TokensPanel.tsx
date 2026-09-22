@@ -24,8 +24,8 @@ import {
   colorOf,
   fromOf,
   snapTo,
-  withOverride,
   type Theme,
+  type Override,
   type Scheme,
 } from "@/lib/theme.ts";
 import { STOP_NAMES } from "@/lib/format.ts";
@@ -43,7 +43,7 @@ function Cell({
   token,
   selection,
   onLocate,
-  onUpdate,
+  onOverride,
 }: {
   theme: Theme;
   audit: TokenSetAudit;
@@ -51,7 +51,11 @@ function Cell({
   token: string;
   selection: StepRef | null;
   onLocate: (ref: StepRef) => void;
-  onUpdate: (b: Theme) => void;
+  onOverride: (
+    scheme: Scheme,
+    token: string,
+    override: Override | null,
+  ) => void;
 }) {
   const [note, setNote] = useState<string | null>(null);
   const a = audit[scheme].find((x) => x.token === token)!;
@@ -75,15 +79,12 @@ function Cell({
       : { solve: `solve from ${fromOf(theme, scheme, token)}` }),
   };
   const setStep = (v: string) =>
-    onUpdate(
-      withOverride(
-        theme,
-        scheme,
-        token,
-        v === "solve"
-          ? { solve: true, from: fromOf(theme, scheme, token) }
-          : { step: Number(v) },
-      ),
+    onOverride(
+      scheme,
+      token,
+      v === "solve"
+        ? { solve: true, from: fromOf(theme, scheme, token) }
+        : { step: Number(v) },
     );
   const stepLabel = solved
     ? `solved → ${landed === null ? "—" : STOP_NAMES[landed.step]}`
@@ -156,7 +157,7 @@ function Cell({
                 );
               } else {
                 setNote(null);
-                onUpdate(withOverride(theme, scheme, token, snapped));
+                onOverride(scheme, token, snapped);
               }
             }}
           >
@@ -170,7 +171,7 @@ function Cell({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => onUpdate(withOverride(theme, scheme, token, null))}
+            onClick={() => onOverride(scheme, token, null)}
           >
             Reset
           </Button>
@@ -191,14 +192,18 @@ export function TokensPanel({
   audit,
   selection = null,
   onLocate = () => {},
-  onUpdate,
+  onOverride,
 }: {
   theme: Theme;
   audit: TokenSetAudit;
   /** The step selected on the ramps, if any. */
   selection?: StepRef | null;
   onLocate?: (ref: StepRef) => void;
-  onUpdate: (b: Theme) => void;
+  onOverride: (
+    scheme: Scheme,
+    token: string,
+    override: Override | null,
+  ) => void;
 }) {
   return (
     <Table>
@@ -224,7 +229,7 @@ export function TokensPanel({
                 token={token}
                 selection={selection}
                 onLocate={onLocate}
-                onUpdate={onUpdate}
+                onOverride={onOverride}
               />
             ))}
           </TableRow>

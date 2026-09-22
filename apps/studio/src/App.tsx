@@ -1,4 +1,18 @@
-import { auditOf, newTheme, type Theme } from "@/lib/theme.ts";
+import type { OkLCH } from "@jamiethompson/oklch";
+import {
+  auditOf,
+  newTheme,
+  withHarmony,
+  withOverride,
+  withPrimary,
+  withRole,
+  withSecondary,
+  withStep,
+  type Override,
+  type Role,
+  type Scheme,
+  type Theme,
+} from "@/lib/theme.ts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ThemeBar } from "@/components/ThemeBar.tsx";
@@ -66,6 +80,25 @@ export function App() {
     [theme?.gamut, isDraft, dirty, tryTheme],
   );
 
+  /** A change to the current theme, or the message it was refused with. */
+  const attempt = (f: (t: Theme) => Theme): string | null => {
+    if (theme === null) return "no theme";
+    try {
+      studio.update(f(theme));
+      return null;
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  };
+  const paletteActions = {
+    onStep: (ramp: string, i: number, step: OkLCH) =>
+      attempt((t) => withStep(t, ramp, i, step)),
+    onRole: (role: Role, ramp: string) =>
+      attempt((t) => withRole(t, role, ramp)),
+    onOverride: (scheme: Scheme, token: string, o: Override | null) =>
+      attempt((t) => withOverride(t, scheme, token, o)),
+  };
+
   const failing =
     audit === null
       ? 0
@@ -96,7 +129,9 @@ export function App() {
           <div className="grid gap-4 p-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
             <SeedRail
               theme={theme}
-              onUpdate={studio.update}
+              onPrimary={(c) => attempt((t) => withPrimary(t, c))}
+              onSecondary={(c) => attempt((t) => withSecondary(t, c))}
+              onHarmony={(k) => attempt((t) => withHarmony(t, k))}
               className="rounded-lg border px-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
             />
             <main className="min-w-0">
@@ -112,7 +147,7 @@ export function App() {
                   <PalettePanel
                     theme={theme}
                     audit={audit}
-                    onUpdate={studio.update}
+                    actions={paletteActions}
                   />
                 </TabsContent>
                 <TabsContent value="export" className="mt-3">

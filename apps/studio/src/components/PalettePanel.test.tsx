@@ -1,17 +1,22 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { PalettePanel } from "./PalettePanel.tsx";
+import { PalettePanel, type PaletteActions } from "./PalettePanel.tsx";
 import { STOP_NAMES } from "@/lib/format.ts";
 import { auditOf, newTheme, withOverride, type Theme } from "@/lib/theme.ts";
 
 const acme = () => newTheme("Acme", "#2563eb", "srgb");
-const panel = (theme: Theme, onUpdate = vi.fn<(b: Theme) => void>()) => {
+const panel = (theme: Theme) => {
+  const actions = {
+    onStep: vi.fn<PaletteActions["onStep"]>(),
+    onRole: vi.fn<PaletteActions["onRole"]>(),
+    onOverride: vi.fn<PaletteActions["onOverride"]>(),
+  };
   render(
-    <PalettePanel theme={theme} audit={auditOf(theme)} onUpdate={onUpdate} />,
+    <PalettePanel theme={theme} audit={auditOf(theme)} actions={actions} />,
   );
-  return onUpdate;
+  return actions;
 };
 const ramp = (name: string) =>
   within(screen.getByRole("region", { name: `ramp ${name}` }));
@@ -57,29 +62,38 @@ describe("PalettePanel", () => {
     ).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("giving a chart series a ramp moves that token to it", async () => {
-    const onUpdate = panel(acme());
+  it("giving a chart series a ramp asks for that role on it", async () => {
+    const { onRole } = panel(acme());
     await userEvent.click(
       ramp("red").getByRole("button", { name: "chart-2 role on red" }),
     );
-    const next = onUpdate.mock.calls[0]![0];
-    expect(next.assignment["chart-2"]).toBe("red");
-    const chart2 = auditOf(next).light.find((a) => a.token === "chart-2")!;
-    expect(chart2.binding.ramp).toBe("red");
+    expect(onRole).toHaveBeenCalledWith("chart-2", "red");
   });
 
   it("clicking a role on a ramp gives that ramp the role", async () => {
-    const onUpdate = panel(acme());
+    const { onRole } = panel(acme());
     await userEvent.click(
       ramp("primary").getByRole("button", { name: "accent role on primary" }),
     );
-    expect(onUpdate).toHaveBeenCalledTimes(1);
-    expect(onUpdate.mock.calls[0]![0].assignment.accent).toBe("primary");
+    expect(onRole).toHaveBeenCalledTimes(1);
+    expect(onRole).toHaveBeenCalledWith("accent", "primary");
     // A role the ramp already plays is not re-sent.
     await userEvent.click(
       ramp("primary").getByRole("button", { name: "primary role on primary" }),
     );
-    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onRole).toHaveBeenCalledTimes(1);
+  });
+
+  it("moving the selected step's channel asks for that step", async () => {
+    const b = acme();
+    const { onStep } = panel(b);
+    const seed = b.ramps.find((r) => r.name === "primary")!.seed!;
+    const l = ramp("primary").getByLabelText("L value");
+    fireEvent.change(l, { target: { value: "0.5" } });
+    const last = onStep.mock.calls.at(-1)!;
+    expect(last[0]).toBe("primary");
+    expect(last[1]).toBe(seed);
+    expect(last[2].L).toBe(0.5);
   });
 
   it("a token's swatch selects the step it came from, and the step lists its tokens", async () => {

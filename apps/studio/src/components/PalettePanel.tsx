@@ -1,10 +1,10 @@
-import type { TokenAudit, TokenSetAudit } from "@jamiethompson/oklch";
+import type { OkLCH, TokenAudit, TokenSetAudit } from "@jamiethompson/oklch";
 import { useMemo, useState } from "react";
 
 import { Preview } from "@/components/Preview.tsx";
 import { RampEditor } from "@/components/RampEditor.tsx";
 import { tokenCellId, TokensPanel } from "@/components/TokensPanel.tsx";
-import { withRole, withStep, type Theme } from "@/lib/theme.ts";
+import type { Theme, Override, Role, Scheme } from "@/lib/theme.ts";
 import { usageOf, type StepRef } from "@/lib/usage.ts";
 
 /** The step selected when nothing has been: the primary's seed step, else its middle. */
@@ -43,14 +43,24 @@ function Section({
  * locates the step it came from. Roles are given on the ramp that plays
  * them, and a token's ramp is its role's: the eye moves steps, not ramps.
  */
+export interface PaletteActions {
+  onStep: (ramp: string, index: number, step: OkLCH) => void;
+  onRole: (role: Role, ramp: string) => void;
+  onOverride: (
+    scheme: Scheme,
+    token: string,
+    override: Override | null,
+  ) => void;
+}
+
 export function PalettePanel({
   theme,
   audit,
-  onUpdate,
+  actions,
 }: {
   theme: Theme;
   audit: TokenSetAudit;
-  onUpdate: (b: Theme) => void;
+  actions: PaletteActions;
 }) {
   const [selected, setSelected] = useState<StepRef | null>(null);
   const usage = useMemo(() => usageOf(audit), [audit]);
@@ -93,8 +103,8 @@ export function PalettePanel({
             selected={selection?.ramp === ramp.name ? selection.step : null}
             onSelect={(step) => setSelected({ ramp: ramp.name, step })}
             onShowToken={showToken}
-            onRole={(role) => onUpdate(withRole(theme, role, ramp.name))}
-            onStep={(i, s) => onUpdate(withStep(theme, ramp.name, i, s))}
+            onRole={(role) => actions.onRole(role, ramp.name)}
+            onStep={(i, s) => actions.onStep(ramp.name, i, s)}
           />
         ))}
       </Section>
@@ -130,7 +140,7 @@ export function PalettePanel({
           audit={audit}
           selection={selection}
           onLocate={locate}
-          onUpdate={onUpdate}
+          onOverride={actions.onOverride}
         />
       </Section>
     </div>

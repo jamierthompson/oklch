@@ -91,15 +91,36 @@ export const DESTRUCTIVE_HUE = 25;
 /** Below this chroma a color has no hue worth building on. */
 export const ACHROMATIC = 0.03;
 
+/** Each harmony by name, with what it is for. Offsets live in `HARMONY_KINDS`. */
 export const HARMONY_LABELS: Record<
   HarmonyKind,
-  { readonly name: string; readonly short: string }
+  { readonly name: string; readonly description: string }
 > = {
-  analogous: { name: "Analogous", short: "±30°" },
-  complementary: { name: "Complementary", short: "180°" },
-  "split-complementary": { name: "Split-complementary", short: "150/210°" },
-  triadic: { name: "Triadic", short: "±120°" },
-  tetradic: { name: "Tetradic", short: "90°×3" },
+  analogous: {
+    name: "Analogous",
+    description:
+      "The neighbours on the wheel. One family of hue: calm, and the accents stay close to the brand.",
+  },
+  complementary: {
+    name: "Complementary",
+    description:
+      "The opposite hue. The strongest contrast the wheel has, for one accent that has to stand apart.",
+  },
+  "split-complementary": {
+    name: "Split-complementary",
+    description:
+      "The opposite hue's neighbours. Contrast without the tension of a direct opposite.",
+  },
+  triadic: {
+    name: "Triadic",
+    description:
+      "Three hues at even thirds. Balanced and vivid; the chart series get the most from it.",
+  },
+  tetradic: {
+    name: "Tetradic",
+    description:
+      "Four hues at even quarters. The richest set, and the hardest to keep from competing.",
+  },
 };
 
 export function isChromatic(c: OkLCH): boolean {
@@ -120,9 +141,9 @@ export function hueSourceOf(
 export const harmonyName = (n: number): string => `harmony-${n}`;
 
 /**
- * Every ramp the seeds draft, in display order: the tinted neutral, the
- * primary through its seed, the secondary through its seed when there is
- * one, a red, and one ramp per harmony offset. Throws when a seed sits
+ * Every ramp the seeds draft, in display order: the primary through its
+ * seed, the secondary through its seed when there is one, the tinted
+ * neutral, a red, and one ramp per harmony offset. Throws when a seed sits
  * beyond the gamut's safe chroma at its lightness.
  */
 export function draftRamps(
@@ -171,7 +192,7 @@ export function draftRamps(
       : HARMONY_KINDS[brand.harmony].map((offset, i) =>
           at(harmonyName(i + 1), source.H + offset, share),
         );
-  return [neutral, primary, ...secondary, red, ...harmonies];
+  return [primary, ...secondary, neutral, red, ...harmonies];
 }
 
 export function newId(): string {

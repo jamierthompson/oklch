@@ -15,7 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DRAFT } from "@/hooks/useBrands.ts";
-import { download, fileName, serialize } from "@/lib/storage.ts";
 
 export function BrandBar({
   brands,
@@ -116,14 +115,6 @@ export function BrandBar({
             Duplicate
           </Button>
         )}
-        <Button
-          variant="outline"
-          onClick={() =>
-            download(fileName(brand), serialize(brand), "application/json")
-          }
-        >
-          Save file
-        </Button>
         <Button variant="destructive" onClick={onRemove}>
           {isDraft ? "Discard draft" : "Delete"}
         </Button>

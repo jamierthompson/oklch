@@ -93,7 +93,12 @@ export function App() {
             <StartBrand onPick={pick} />
           </main>
         ) : (
-          <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="grid gap-4 p-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
+            <SeedRail
+              brand={brand}
+              onUpdate={studio.update}
+              className="rounded-lg border px-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
+            />
             <main className="min-w-0">
               <Tabs defaultValue="palette">
                 <TabsList>
@@ -115,11 +120,6 @@ export function App() {
                 </TabsContent>
               </Tabs>
             </main>
-            <SeedRail
-              brand={brand}
-              onUpdate={studio.update}
-              className="rounded-lg border px-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
-            />
           </div>
         )}
         <AlertDialog

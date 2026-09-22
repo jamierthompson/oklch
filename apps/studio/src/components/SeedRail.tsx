@@ -1,19 +1,17 @@
 import {
   formatHex,
   formatOklch,
-  HARMONY_KINDS,
   maxChroma,
   parseColor,
-  type HarmonyKind,
   type OkLCH,
 } from "@jamiethompson/oklch";
 import { useEffect, useState } from "react";
 
 import { Field } from "@/components/Field.tsx";
+import { HarmonyPicker } from "@/components/HarmonyPicker.tsx";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  HARMONY_LABELS,
   hueSourceOf,
   isChromatic,
   withHarmony,
@@ -263,40 +261,11 @@ export function SeedRail({
             : "Harmony of the secondary hue"
         }
       >
-        <div
-          className="grid grid-flow-col auto-cols-fr overflow-hidden rounded-md border"
-          role="group"
-          aria-label="Harmony"
-        >
-          {(Object.keys(HARMONY_KINDS) as HarmonyKind[]).map((kind) => {
-            const on = brand.harmony === kind;
-            return (
-              <button
-                key={kind}
-                type="button"
-                aria-pressed={on}
-                aria-label={HARMONY_LABELS[kind].name}
-                title={HARMONY_LABELS[kind].name}
-                onClick={() => !on && attempt(() => withHarmony(brand, kind))}
-                className={
-                  "border-r px-1 py-1.5 text-xs last:border-r-0 " +
-                  (on
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:text-foreground")
-                }
-              >
-                {HARMONY_LABELS[kind].short}
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {HARMONY_LABELS[brand.harmony].name} —{" "}
-          {HARMONY_KINDS[brand.harmony]
-            .map((d) => `${d > 0 ? "+" : ""}${d}°`)
-            .join(", ")}
-          {source === null ? " · no hue to build on" : ""}
-        </p>
+        <HarmonyPicker
+          value={brand.harmony}
+          hue={source?.H ?? null}
+          onChange={(kind) => attempt(() => withHarmony(brand, kind))}
+        />
       </Group>
 
       {notes.length > 0 && (

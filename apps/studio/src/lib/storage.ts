@@ -1,6 +1,6 @@
-/** Brands live in localStorage; a JSON file is the way out. */
+/** Brands live in localStorage. */
 
-import { parse, serialize, type Brand } from "@/lib/brand.ts";
+import { parse, type Brand } from "@/lib/brand.ts";
 
 const KEY = "oklch-studio/brands";
 
@@ -49,14 +49,3 @@ export function download(name: string, text: string, type: string): void {
   a.click();
   URL.revokeObjectURL(url);
 }
-
-export function fileName(brand: Brand): string {
-  return `${
-    brand.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || "brand"
-  }.oklch.json`;
-}
-
-export { serialize };

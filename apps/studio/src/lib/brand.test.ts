@@ -22,27 +22,28 @@ import {
 const acme = () => newBrand("Acme", "#2563eb", "srgb");
 const names = (b: ReturnType<typeof acme>) => b.ramps.map((r) => r.name);
 const amber = { L: 0.7, C: 0.15, H: 70 };
+const rampNamed = (b: ReturnType<typeof acme>, name: string) =>
+  b.ramps.find((r) => r.name === name)!;
 
 describe("newBrand", () => {
   it("drafts a tinted neutral, the primary through the seed, a red, and the analogous harmonies", () => {
     const b = acme();
     expect(names(b)).toEqual([
-      "neutral",
       "primary",
+      "neutral",
       "red",
       "harmony-1",
       "harmony-2",
     ]);
     for (const r of b.ramps) expect(r.steps).toHaveLength(11);
-    expect(b.ramps[0]!.steps.map((s) => s.L)).toEqual([
-      ...TAILWIND_STOPS.neutral,
-    ]);
-    expect(b.ramps[0]!.steps[5]!.C).toBeGreaterThan(0.005);
+    const neutral = rampNamed(b, "neutral");
+    expect(neutral.steps.map((s) => s.L)).toEqual([...TAILWIND_STOPS.neutral]);
+    expect(neutral.steps[5]!.C).toBeGreaterThan(0.005);
     expect(b.secondary).toBeNull();
     expect(b.harmony).toBe("analogous");
     expect(b.assignment).toEqual({});
     // The primary is a step of its ramp, exactly.
-    const primary = b.ramps[1]!;
+    const primary = rampNamed(b, "primary");
     expect(primary.seed).not.toBeNull();
     expect(primary.steps[primary.seed!]).toEqual(b.primary);
     // The harmonies sit at the primary's hue plus the offsets.
@@ -130,8 +131,8 @@ describe("seeds", () => {
     const moved = withStep(acme(), "primary", 5, { L: 0.5, C: 0.1, H: 200 });
     const b = withHarmony(moved, "tetradic");
     expect(names(b)).toEqual([
-      "neutral",
       "primary",
+      "neutral",
       "red",
       "harmony-1",
       "harmony-2",
@@ -143,8 +144,8 @@ describe("seeds", () => {
       H: 200,
     });
     expect(names(withHarmony(b, "complementary"))).toEqual([
-      "neutral",
       "primary",
+      "neutral",
       "red",
       "harmony-1",
     ]);
@@ -153,18 +154,18 @@ describe("seeds", () => {
   it("an achromatic primary builds the tint and the harmonies on the secondary's hue, or on nothing", () => {
     const gray = newBrand("Gray", "#475569", "srgb");
     const flat = withPrimary(gray, { L: 0.4, C: 0.005, H: 0 });
-    expect(names(flat)).toEqual(["neutral", "primary", "red"]);
-    expect(flat.ramps[0]!.steps[5]!.C).toBe(0);
+    expect(names(flat)).toEqual(["primary", "neutral", "red"]);
+    expect(rampNamed(flat, "neutral").steps[5]!.C).toBe(0);
     const tinted = withSecondary(flat, amber);
     expect(names(tinted)).toEqual([
-      "neutral",
       "primary",
       "secondary",
+      "neutral",
       "red",
       "harmony-1",
       "harmony-2",
     ]);
-    expect(tinted.ramps[0]!.steps[5]!.H).toBeCloseTo(70, 0);
+    expect(rampNamed(tinted, "neutral").steps[5]!.H).toBeCloseTo(70, 0);
     expect(auditOf(tinted).passes).toBe(true);
   });
 

@@ -1,9 +1,14 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { SeedRail } from "./SeedRail.tsx";
-import { newBrand, withSecondary, type Brand } from "@/lib/brand.ts";
+import {
+  newBrand,
+  withHarmony,
+  withSecondary,
+  type Brand,
+} from "@/lib/brand.ts";
 
 const acme = () => newBrand("Acme", "#2563eb", "srgb");
 const rail = (brand: Brand) => {
@@ -83,13 +88,23 @@ describe("SeedRail", () => {
     const next = last(onUpdate);
     expect(next.harmony).toBe("tetradic");
     expect(next.ramps.map((r) => r.name)).toEqual([
-      "neutral",
       "primary",
+      "neutral",
       "red",
       "harmony-1",
       "harmony-2",
       "harmony-3",
     ]);
+  });
+
+  it("describes the chosen harmony, with its offsets", () => {
+    rail(acme());
+    expect(screen.getByText("-30°, +30°")).toBeInTheDocument();
+    expect(screen.getByText(/The neighbours on the wheel/)).toBeInTheDocument();
+    cleanup();
+    rail(withHarmony(acme(), "tetradic"));
+    expect(screen.getByText("+90°, +180°, +270°")).toBeInTheDocument();
+    expect(screen.getByText(/Four hues at even quarters/)).toBeInTheDocument();
   });
 
   it("notes an achromatic primary", () => {

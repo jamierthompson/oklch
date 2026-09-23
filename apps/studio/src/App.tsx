@@ -144,6 +144,9 @@ export function App() {
   const paletteActions = {
     onStep: studio.moveStep,
     onRole: studio.setRole,
+    onRedraw: studio.redraw,
+    onAddRamp: studio.addRamp,
+    onRemoveRamp: studio.removeRamp,
     onOverride: studio.setOverride,
   };
   const rail = (className: string) =>
@@ -246,7 +249,7 @@ export function App() {
                 </div>
               </div>
               <SheetDescription>
-                The two seeds and the harmony the ramps are drafted from.
+                The two seeds and the harmony the ramps are drawn from.
               </SheetDescription>
             </SheetHeader>
             {rail("px-4")}

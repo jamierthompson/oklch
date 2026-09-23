@@ -1,8 +1,9 @@
 /**
- * A theme: two seeds and a harmony, the ramps drafted from them and then
- * moved by eye, which ramp plays which shadcn role, and the steps moved
- * off the preset. Everything derived — bindings, audit, exports — is a
- * pure function of this document.
+ * A theme: two seeds and a harmony, the ramps drawn from them and then
+ * moved by eye, any ramp the eye redrew or added by its own recipe, which
+ * ramp plays which shadcn role, and the steps moved off the preset.
+ * Everything derived — bindings, audit, exports — is a pure function of
+ * this document.
  */
 
 import {
@@ -55,12 +56,42 @@ export type Role = (typeof ROLES)[number];
 /** The eye's choice of ramp for a role. A role left out plays on its default, which depends on the ramps the theme has. */
 export type Assignment = { readonly [R in Role]?: string };
 
-/** One ramp as it stands: drafted from the seeds, then moved by eye. */
+export type Stops = "chromatic" | "neutral";
+
+/** How a ramp is drawn: at a hue with a share of the gamut's chroma, or through a color that becomes a step exactly. */
+export type Recipe =
+  | {
+      readonly kind: "hue";
+      readonly hue: number;
+      /** The share of the safe chroma at each step, 0 to 1. */
+      readonly saturation: number;
+      readonly stops: Stops;
+    }
+  | { readonly kind: "through"; readonly color: OkLCH; readonly stops: Stops };
+
+/** One ramp as it stands: drawn by the seeds or by the eye's recipe, then moved by eye. */
 export interface ThemeRamp {
   readonly name: string;
   readonly steps: readonly OkLCH[];
   /** The step placed on the seed, for a ramp drawn through one. */
   readonly seed: number | null;
+  /**
+   * The eye's recipe, when the ramp is not what the seeds draw: a redrawn
+   * neutral, red, or harmony, or a ramp the eye added. Absent on a ramp
+   * the seeds draw.
+   */
+  readonly recipe?: Recipe;
+}
+
+/** The names the seeds draw. An added ramp cannot take one, and one of these cannot be removed. */
+const SEEDS_RAMP = /^(neutral|primary|secondary|red|harmony-\d+)$/;
+/** The ramps drawn through a theme seed: their recipe is the seed, moved in the rail. */
+const SEED_RAMPS = ["primary", "secondary"] as const;
+const RAMP_NAME = /^[a-z][a-z0-9-]*$/;
+
+/** Whether the seeds draw a ramp of this name, in some theme. */
+export function isSeedsRamp(name: string): boolean {
+  return SEEDS_RAMP.test(name);
 }
 
 /** The eye's replacement for one token's preset step, on the ramp its role plays. Surface and target stay the preset's. */
@@ -153,59 +184,104 @@ export function hueSourceOf(
 /** The name of the nth harmony ramp, counting from 1. */
 export const harmonyName = (n: number): string => `harmony-${n}`;
 
+type Seeds = Pick<Theme, "primary" | "secondary" | "harmony" | "gamut">;
+
 /**
- * Every ramp the seeds draft, in display order: the primary through its
- * seed, the secondary through its seed when there is one, the tinted
- * neutral, a red, and one ramp per harmony offset. Throws when a seed sits
- * beyond the gamut's safe chroma at its lightness.
+ * The recipe of every ramp the seeds draw, in display order: the primary
+ * through its seed, the secondary through its seed when there is one, the
+ * tinted neutral, a red, and one ramp per harmony offset. Throws when a
+ * seed sits beyond the gamut's safe chroma at its lightness.
  */
-export function draftRamps(
-  theme: Pick<Theme, "primary" | "secondary" | "harmony" | "gamut">,
-): ThemeRamp[] {
-  const { gamut } = theme;
+export function seedRecipes(
+  theme: Seeds,
+): { readonly name: string; readonly recipe: Recipe }[] {
   const source = hueSourceOf(theme.primary, theme.secondary);
-  const through = (name: string, color: OkLCH): ThemeRamp => {
-    const r = createRamp({
-      through: color,
-      lightness: TAILWIND_STOPS.chromatic,
-      gamut,
-    });
-    return { name, steps: r.steps, seed: r.through?.index ?? null };
-  };
-  const at = (name: string, hue: number, saturation: number): ThemeRamp => ({
+  const through = (name: string, color: OkLCH) => ({
     name,
-    steps: createRamp({
-      hue,
-      saturation,
-      lightness: TAILWIND_STOPS.chromatic,
-      gamut,
-    }).steps,
-    seed: null,
+    recipe: { kind: "through", color, stops: "chromatic" } as const,
   });
-  const primary = through("primary", theme.primary);
+  const at = (name: string, hue: number, saturation: number, stops: Stops) => ({
+    name,
+    recipe: { kind: "hue", hue, saturation, stops } as const,
+  });
   const secondary =
     theme.secondary === null ? [] : [through("secondary", theme.secondary)];
-  const neutral: ThemeRamp = {
-    name: "neutral",
-    steps: createRamp({
-      hue: source?.H ?? 0,
-      saturation: source === null ? 0 : NEUTRAL_TINT,
-      lightness: TAILWIND_STOPS.neutral,
-      gamut,
-    }).steps,
-    seed: null,
-  };
-  const red = at("red", DESTRUCTIVE_HUE, 0.85);
+  const neutral = at(
+    "neutral",
+    source?.H ?? 0,
+    source === null ? 0 : NEUTRAL_TINT,
+    "neutral",
+  );
   // The harmonies keep the source's share of the gamut, so they read as one family.
   const share =
-    source === null ? 0 : createRamp({ through: source, gamut }).saturation;
+    source === null
+      ? 0
+      : createRamp({ through: source, gamut: theme.gamut }).saturation;
   const harmonies =
     source === null
       ? []
       : HARMONY_KINDS[theme.harmony].map((offset, i) =>
-          at(harmonyName(i + 1), source.H + offset, share),
+          at(harmonyName(i + 1), source.H + offset, share, "chromatic"),
         );
-  return [primary, ...secondary, neutral, red, ...harmonies];
+  return [
+    through("primary", theme.primary),
+    ...secondary,
+    neutral,
+    at("red", DESTRUCTIVE_HUE, 0.85, "chromatic"),
+    ...harmonies,
+  ];
+}
+
+/** A ramp freshly drawn by a recipe. Throws when a through color sits beyond the gamut's safe chroma at its lightness. */
+export function drawRamp(
+  name: string,
+  recipe: Recipe,
+  gamut: Gamut,
+): ThemeRamp {
+  const lightness = TAILWIND_STOPS[recipe.stops];
+  const r =
+    recipe.kind === "through"
+      ? createRamp({ through: recipe.color, lightness, gamut })
+      : createRamp({
+          hue: recipe.hue,
+          saturation: recipe.saturation,
+          lightness,
+          gamut,
+        });
+  return { name, steps: r.steps, seed: r.through?.index ?? null };
+}
+
+/** Every ramp the seeds draw, fresh, in display order. */
+export function seedRamps(theme: Seeds): ThemeRamp[] {
+  return seedRecipes(theme).map(({ name, recipe }) =>
+    drawRamp(name, recipe, theme.gamut),
+  );
+}
+
+/** How a ramp is drawn now: the eye's recipe, else the seeds'. Throws by name on a ramp the theme does not have. */
+export function recipeOf(theme: Theme, name: string): Recipe {
+  const ramp = theme.ramps.find((r) => r.name === name);
+  if (ramp === undefined) throw new Error(`no ramp named "${name}"`);
+  if (ramp.recipe !== undefined) return ramp.recipe;
+  const drawn = seedRecipes(theme).find((d) => d.name === name);
+  if (drawn === undefined) {
+    throw new Error(
+      `ramp "${name}" has no recipe and the seeds do not draw it`,
+    );
+  }
+  return drawn.recipe;
+}
+
+/** Every ramp as it would be freshly drawn: by the seeds, or by the eye's recipe. What the eye moved is measured against this. */
+export function drawnRamps(theme: Theme): ThemeRamp[] {
+  const bySeeds = new Map(seedRamps(theme).map((r) => [r.name, r]));
+  return theme.ramps.flatMap((r) => {
+    if (r.recipe !== undefined) {
+      return [{ ...drawRamp(r.name, r.recipe, theme.gamut), recipe: r.recipe }];
+    }
+    const d = bySeeds.get(r.name);
+    return d === undefined ? [] : [d];
+  });
 }
 
 export function newId(): string {
@@ -232,7 +308,7 @@ export function newTheme(name: string, seed: string, gamut: Gamut): Theme {
     name,
     radius: "0.625rem",
     ...seeds,
-    ramps: draftRamps(seeds),
+    ramps: seedRamps(seeds),
     assignment: {},
     overrides: { light: {}, dark: {} },
   };
@@ -268,7 +344,7 @@ export function randomTheme(
     name,
     radius: "0.625rem",
     ...seeds,
-    ramps: draftRamps(seeds),
+    ramps: seedRamps(seeds),
     assignment: {},
     overrides: { light: {}, dark: {} },
   };
@@ -459,8 +535,9 @@ export function withOverride(
 
 /**
  * Move one step. The step a seed sits on is the seed: moving it moves the
- * seed too, kept within the safe chroma so the ramp can still be drawn
- * through it, and nothing else redraws.
+ * seed too — the theme's, or the through color of the ramp's own recipe —
+ * kept within the safe chroma so the ramp can still be drawn through it,
+ * and nothing else redraws.
  */
 export function withStep(
   theme: Theme,
@@ -469,34 +546,120 @@ export function withStep(
   step: OkLCH,
 ): Theme {
   const ramp = theme.ramps.find((r) => r.name === rampName);
-  const seeded =
-    ramp !== undefined &&
-    ramp.seed === index &&
-    (rampName === "primary" || rampName === "secondary");
-  const placed = seeded ? safeSeed(step, theme.gamut) : step;
+  const onSeed = ramp !== undefined && ramp.seed === index;
+  const placed = onSeed ? safeSeed(step, theme.gamut) : step;
+  const themeSeed =
+    onSeed &&
+    ramp.recipe === undefined &&
+    (SEED_RAMPS as readonly string[]).includes(rampName);
+  const recipe =
+    onSeed && ramp.recipe?.kind === "through"
+      ? { recipe: { ...ramp.recipe, color: placed } }
+      : {};
   return {
     ...theme,
-    ...(seeded ? { [rampName]: placed } : {}),
+    ...(themeSeed ? { [rampName]: placed } : {}),
     ramps: theme.ramps.map((r) =>
       r.name === rampName
-        ? { ...r, steps: r.steps.map((s, i) => (i === index ? placed : s)) }
+        ? {
+            ...r,
+            ...recipe,
+            steps: r.steps.map((s, i) => (i === index ? placed : s)),
+          }
         : r,
     ),
   };
 }
 
 /**
- * Redraft the ramps from the seeds, keeping the steps of every ramp in
+ * Redraw one ramp by a recipe of the eye's, or by the seeds' again with
+ * `null`. Either way the eye's moves on it are dropped. The primary and
+ * the secondary are drawn through their seeds and take no recipe; a ramp
+ * the eye added has no seeds to go back to. Throws by name.
+ */
+export function withRecipe(
+  theme: Theme,
+  name: string,
+  recipe: Recipe | null,
+): Theme {
+  if (!hasRamp(theme, name)) throw new Error(`no ramp named "${name}"`);
+  if (recipe !== null && (SEED_RAMPS as readonly string[]).includes(name)) {
+    throw new Error(
+      `${name} is drawn through the ${name} seed; move the seed in the rail instead`,
+    );
+  }
+  if (recipe === null && !isSeedsRamp(name)) {
+    throw new Error(
+      `ramp "${name}" was added by hand; the seeds do not draw it`,
+    );
+  }
+  const drawn =
+    recipe === null
+      ? seedRamps(theme).find((r) => r.name === name)
+      : { ...drawRamp(name, recipe, theme.gamut), recipe };
+  if (drawn === undefined) {
+    throw new Error(`the seeds no longer draw a ramp named "${name}"`);
+  }
+  return {
+    ...theme,
+    ramps: theme.ramps.map((r) => (r.name === name ? drawn : r)),
+  };
+}
+
+/**
+ * Add a ramp drawn by a recipe, after the others. Throws by name on a name
+ * that is not lowercase letters, digits and hyphens starting with a
+ * letter, one the seeds draw, or one the theme already has.
+ */
+export function withRamp(theme: Theme, name: string, recipe: Recipe): Theme {
+  if (!RAMP_NAME.test(name)) {
+    throw new Error(
+      `ramp name "${name}" must be lowercase letters, digits and hyphens, starting with a letter`,
+    );
+  }
+  if (isSeedsRamp(name)) {
+    throw new Error(`"${name}" is a name the seeds draw; pick another`);
+  }
+  if (hasRamp(theme, name)) {
+    throw new Error(`a ramp named "${name}" already exists`);
+  }
+  return {
+    ...theme,
+    ramps: [...theme.ramps, { ...drawRamp(name, recipe, theme.gamut), recipe }],
+  };
+}
+
+/** Remove a ramp the eye added, while it plays no role. Throws by name otherwise. */
+export function withoutRamp(theme: Theme, name: string): Theme {
+  if (!hasRamp(theme, name)) throw new Error(`no ramp named "${name}"`);
+  if (isSeedsRamp(name)) {
+    throw new Error(`the seeds draw ${name}; it cannot be removed`);
+  }
+  const roles = rolesOf(theme, name);
+  if (roles.length > 0) {
+    throw new Error(
+      `ramp "${name}" plays ${roles.join(", ")}; give ${roles.length === 1 ? "that role" : "those roles"} another ramp first`,
+    );
+  }
+  return { ...theme, ramps: theme.ramps.filter((r) => r.name !== name) };
+}
+
+/**
+ * Redraw the ramps from the seeds, keeping the steps of every ramp in
  * `keep` that the seeds still draw, so what the eye moved on a ramp the
- * change did not touch stays moved.
+ * change did not touch stays moved. A ramp the eye redrew by its own
+ * recipe is kept as it stands, and the ramps the eye added follow.
  */
 function redrawn(theme: Theme, keep: readonly string[]): Theme {
   const kept = new Map(
-    theme.ramps.filter((r) => keep.includes(r.name)).map((r) => [r.name, r]),
+    theme.ramps
+      .filter((r) => keep.includes(r.name) || r.recipe !== undefined)
+      .map((r) => [r.name, r]),
   );
+  const added = theme.ramps.filter((r) => !isSeedsRamp(r.name));
   return {
     ...theme,
-    ramps: draftRamps(theme).map((r) => kept.get(r.name) ?? r),
+    ramps: [...seedRamps(theme).map((r) => kept.get(r.name) ?? r), ...added],
   };
 }
 
@@ -546,6 +709,21 @@ function isColor(v: unknown): v is OkLCH {
   );
 }
 
+function isRecipe(v: unknown): v is Recipe {
+  if (typeof v !== "object" || v === null) return false;
+  const r = v as Record<string, unknown>;
+  if (r["stops"] !== "chromatic" && r["stops"] !== "neutral") return false;
+  if (r["kind"] === "through") return isColor(r["color"]);
+  return (
+    r["kind"] === "hue" &&
+    typeof r["hue"] === "number" &&
+    Number.isFinite(r["hue"]) &&
+    typeof r["saturation"] === "number" &&
+    r["saturation"] >= 0 &&
+    r["saturation"] <= 1
+  );
+}
+
 /** Reads a theme back, naming what is wrong with it. */
 export function parse(text: string): Theme {
   const raw: unknown = JSON.parse(text);
@@ -585,6 +763,24 @@ export function parse(text: string): Theme {
     if (ramp["seed"] !== null && !Number.isInteger(ramp["seed"])) {
       throw new Error(
         `ramp "${ramp["name"]}" has a seed step that is not an index`,
+      );
+    }
+    if (ramp["recipe"] !== undefined && !isRecipe(ramp["recipe"])) {
+      throw new Error(
+        `ramp "${ramp["name"]}" has a recipe this version cannot read`,
+      );
+    }
+    if (
+      ramp["recipe"] !== undefined &&
+      (SEED_RAMPS as readonly string[]).includes(ramp["name"])
+    ) {
+      throw new Error(
+        `ramp "${ramp["name"]}" is drawn through its seed and takes no recipe`,
+      );
+    }
+    if (ramp["recipe"] === undefined && !isSeedsRamp(ramp["name"])) {
+      throw new Error(
+        `ramp "${ramp["name"]}" was added by hand but has no recipe`,
       );
     }
   }

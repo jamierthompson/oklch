@@ -7,13 +7,17 @@ import {
   newId,
   withHarmony,
   withOverride,
+  withoutRamp,
   withPrimary,
+  withRamp,
+  withRecipe,
   withRole,
   withSecondary,
   withStep,
   type Theme,
   type HarmonyKind,
   type Override,
+  type Recipe,
   type Role,
   type Scheme,
 } from "@/lib/theme.ts";
@@ -39,7 +43,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /**
  * The themes on this machine and everything that happens to them. Every
  * change is a command in the log, applied at once and persisted at once;
- * undo is the safety net, so there is no draft and nothing to save.
+ * undo is the safety net, so nothing waits to be saved.
  */
 export function useStudio() {
   const [state, setState] = useState<Stored>(initial);
@@ -200,6 +204,46 @@ export function useStudio() {
     [on],
   );
 
+  /** Redraw a ramp by a recipe, or by the seeds again with null. */
+  const redraw = useCallback(
+    (ramp: string, recipe: Recipe | null) =>
+      on(null, (b) => {
+        const from = b.ramps.find((r) => r.name === ramp);
+        if (from === undefined) throw new Error(`no ramp named "${ramp}"`);
+        const to = withRecipe(b, ramp, recipe).ramps.find(
+          (r) => r.name === ramp,
+        )!;
+        return { kind: "redraw", ramp, from, to };
+      }),
+    [on],
+  );
+
+  const addRamp = useCallback(
+    (name: string, recipe: Recipe) =>
+      on(null, (b) => {
+        const next = withRamp(b, name, recipe);
+        return {
+          kind: "add-ramp",
+          index: next.ramps.length - 1,
+          ramp: next.ramps.at(-1)!,
+        };
+      }),
+    [on],
+  );
+
+  const removeRamp = useCallback(
+    (name: string) =>
+      on(null, (b) => {
+        withoutRamp(b, name);
+        return {
+          kind: "remove-ramp",
+          index: b.ramps.findIndex((r) => r.name === name),
+          ramp: b.ramps.find((r) => r.name === name)!,
+        };
+      }),
+    [on],
+  );
+
   const setOverride = useCallback(
     (scheme: Scheme, token: string, to: Override | null) =>
       on(null, (b) => {
@@ -282,6 +326,9 @@ export function useStudio() {
     select,
     moveStep,
     setRole,
+    redraw,
+    addRamp,
+    removeRamp,
     setOverride,
     setPrimary,
     setSecondary,

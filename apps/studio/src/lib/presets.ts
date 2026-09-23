@@ -1,9 +1,10 @@
 /**
  * The presets: the themes the studio opens on, each hand-tuned, as a
  * recipe over the formula rather than a frozen palette. The seeds, the
- * harmony, the roles, and any step the eye moved are the recipe; the ramps
- * are still drafted from the seeds, so the presets improve with the math
- * and the recipe reads as exactly what the hand did.
+ * harmony, any ramp redrawn or added by hand, the roles, and any step the
+ * eye moved are the recipe; the ramps are still drawn from the seeds, so
+ * the presets improve with the math and the recipe reads as exactly what
+ * the hand did.
  *
  * Every hex is a commonly published approximation of the colors a theme
  * is named for, not an official value. Not affiliated with or endorsed by
@@ -13,21 +14,25 @@
 import { formatHex, parseColor, type OkLCH } from "@jamiethompson/oklch";
 
 import {
-  draftRamps,
+  drawnRamps,
+  isSeedsRamp,
   newTheme,
   withHarmony,
   withOverride,
+  withRamp,
+  withRecipe,
   withRole,
   withSecondary,
   withStep,
   type Assignment,
   type Theme,
   type HarmonyKind,
+  type Recipe,
   type Role,
 } from "@/lib/theme.ts";
 import { STOP_NAMES } from "@/lib/format.ts";
 
-/** One step the eye moved off the formula's draft. */
+/** One step the eye moved off what the seeds draw. */
 export interface Move {
   readonly ramp: string;
   readonly step: number;
@@ -44,6 +49,8 @@ export interface Preset {
   readonly harmony: HarmonyKind;
   /** Why this preset is not the formula's. */
   readonly why: string;
+  /** Ramps drawn by hand: a seeds' ramp redrawn by this recipe, or a ramp added by name, in order. */
+  readonly recipes?: { readonly [ramp: string]: Recipe };
   readonly roles?: Assignment;
   readonly moves?: readonly Move[];
   readonly overrides?: Theme["overrides"];
@@ -370,6 +377,11 @@ export function themeFromPreset(preset: Preset): Theme {
     b = withSecondary(b, s);
   }
   b = withHarmony(b, preset.harmony);
+  for (const [name, recipe] of Object.entries(preset.recipes ?? {})) {
+    b = isSeedsRamp(name)
+      ? withRecipe(b, name, recipe)
+      : withRamp(b, name, recipe);
+  }
   for (const [role, ramp] of Object.entries(preset.roles ?? {})) {
     b = withRole(b, role as Role, ramp as string);
   }
@@ -391,11 +403,15 @@ const same = (a: OkLCH, b: OkLCH) => a.L === b.L && a.C === b.C && a.H === b.H;
 const num = (n: number, digits: number) => String(Number(n.toFixed(digits)));
 const color = (c: OkLCH) =>
   `{ L: ${num(c.L, 4)}, C: ${num(c.C, 4)}, H: ${num(c.H, 2)} }`;
+const recipe = (r: Recipe) =>
+  r.kind === "through"
+    ? `{ kind: "through", color: ${color(r.color)}, stops: "${r.stops}" }`
+    : `{ kind: "hue", hue: ${num(r.hue, 2)}, saturation: ${num(r.saturation, 3)}, stops: "${r.stops}" }`;
 
 /**
  * The theme as a recipe: what the studio would need to build it again.
- * The steps are diffed against the formula's draft of the same seeds, so
- * only what the eye moved is written down. Paste it into `PRESETS`; a
+ * The steps are diffed against what the same seeds and recipes draw,
+ * so only what the eye moved is written down. Paste it into `PRESETS`; a
  * theme named as a preset is written back as that preset.
  */
 export function presetOf(theme: Theme): string {
@@ -413,10 +429,13 @@ export function presetOf(theme: Theme): string {
     primary,
     ...(secondary === null ? [] : [secondary]),
   ];
-  const draft = new Map(draftRamps(theme).map((r) => [r.name, r]));
+  const drawn = new Map(drawnRamps(theme).map((r) => [r.name, r]));
+  const recipes = theme.ramps
+    .filter((r) => r.recipe !== undefined)
+    .map((r) => `    ${JSON.stringify(r.name)}: ${recipe(r.recipe!)},`);
   const moves: string[] = [];
   for (const r of theme.ramps) {
-    const d = draft.get(r.name);
+    const d = drawn.get(r.name);
     r.steps.forEach((s, i) => {
       const was = d?.steps[i];
       if (was === undefined || !same(was, s)) {
@@ -437,6 +456,7 @@ export function presetOf(theme: Theme): string {
     `  harmony: ${q(theme.harmony)},`,
     `  why: ${q(preset?.why ?? "")},`,
   ];
+  if (recipes.length > 0) lines.push(`  recipes: {`, ...recipes, `  },`);
   if (Object.keys(theme.assignment).length > 0) {
     lines.push(`  roles: ${JSON.stringify(theme.assignment)},`);
   }

@@ -1,5 +1,6 @@
 import {
   HARMONY_KINDS,
+  parseColor,
   SHADCN_TOKENS,
   TAILWIND_STOPS,
 } from "@jamiethompson/oklch";
@@ -9,19 +10,28 @@ import {
   auditOf,
   bindingsOf,
   cssVarsOf,
+  drawnRamps,
+  NEUTRAL_TINT,
   newTheme,
   parse,
   randomTheme,
   rampOf,
+  recipeOf,
   rolesOf,
+  safeSeed,
   serialize,
   snapTo,
   withHarmony,
   withOverride,
+  withoutRamp,
   withPrimary,
+  withRamp,
+  withRecipe,
   withRole,
   withSecondary,
   withStep,
+  type Recipe,
+  type Theme,
 } from "./theme.ts";
 
 const acme = () => newTheme("Acme", "#2563eb", "srgb");
@@ -31,7 +41,7 @@ const rampNamed = (b: ReturnType<typeof acme>, name: string) =>
   b.ramps.find((r) => r.name === name)!;
 
 describe("newTheme", () => {
-  it("drafts a tinted neutral, the primary through the seed, a red, and the analogous harmonies", () => {
+  it("draws a tinted neutral, the primary through the seed, a red, and the analogous harmonies", () => {
     const b = acme();
     expect(names(b)).toEqual([
       "primary",
@@ -130,7 +140,7 @@ describe("the seed step", () => {
     const s2 = rampNamed(b, "secondary").seed!;
     const sec = withStep(b, "secondary", s2, { L: 0.6, C: 0.1, H: 80 });
     expect(sec.secondary).toEqual(rampNamed(sec, "secondary").steps[s2]);
-    // And a harmony change after the move still drafts, since the seed stayed safe.
+    // And a harmony change after the move still draws, since the seed stayed safe.
     expect(() => withHarmony(moved, "triadic")).not.toThrow();
   });
 });
@@ -257,7 +267,7 @@ describe("cssVarsOf", () => {
 });
 
 describe("randomTheme", () => {
-  it("has a primary, a secondary, a harmony, and ramps drafted from them, and clears", () => {
+  it("has a primary, a secondary, a harmony, and ramps drawn from them, and clears", () => {
     let n = 0;
     // A fixed sequence stands in for Math.random, so the test is the same every run.
     const random = () => (n = (n * 9301 + 49297) % 233280) / 233280;
@@ -322,5 +332,178 @@ describe("serialize and parse", () => {
         }),
       ),
     ).toThrow(/neither a step nor a solve/);
+  });
+});
+
+describe("recipes", () => {
+  const teal: Recipe = {
+    kind: "through",
+    color: safeSeed(parseColor("#14b8a6")!, "srgb"),
+    stops: "chromatic",
+  };
+  const rose: Recipe = {
+    kind: "hue",
+    hue: 10,
+    saturation: 0.9,
+    stops: "chromatic",
+  };
+
+  it("redraw a seeds' ramp by the eye's recipe, which the seeds then leave alone", () => {
+    const b = withRecipe(acme(), "red", rose);
+    const red = rampNamed(b, "red");
+    expect(red.recipe).toEqual(rose);
+    expect(red.steps[5]!.H).toBeCloseTo(10, 0);
+    expect(recipeOf(b, "red")).toEqual(rose);
+    const tinted = withRecipe(acme(), "neutral", {
+      kind: "hue",
+      hue: 300,
+      saturation: 0.05,
+      stops: "neutral",
+    });
+    const moved = withPrimary(tinted, { L: 0.6, C: 0.2, H: 30 });
+    expect(rampNamed(moved, "neutral").steps[5]!.H).toBeCloseTo(300, 0);
+    expect(rampNamed(moved, "harmony-1").steps[5]!.H).not.toBeCloseTo(300, 0);
+  });
+
+  it("hand a redrawn ramp back to the seeds, dropping the eye's moves", () => {
+    const own = withStep(
+      withRecipe(acme(), "neutral", {
+        kind: "hue",
+        hue: 300,
+        saturation: 0.05,
+        stops: "neutral",
+      }),
+      "neutral",
+      5,
+      { L: 0.5, C: 0.02, H: 100 },
+    );
+    const back = withRecipe(own, "neutral", null);
+    expect(rampNamed(back, "neutral").recipe).toBeUndefined();
+    expect(rampNamed(back, "neutral").steps).toEqual(
+      rampNamed(acme(), "neutral").steps,
+    );
+    expect(recipeOf(back, "neutral")).toEqual({
+      kind: "hue",
+      hue: acme().primary.H,
+      saturation: NEUTRAL_TINT,
+      stops: "neutral",
+    });
+  });
+
+  it("the primary and secondary are drawn through their seeds: they redraw from the seed and take no recipe", () => {
+    const moved = withStep(acme(), "primary", 2, { L: 0.5, C: 0.1, H: 200 });
+    const back = withRecipe(moved, "primary", null);
+    expect(rampNamed(back, "primary").steps).toEqual(
+      rampNamed(acme(), "primary").steps,
+    );
+    expect(() => withRecipe(acme(), "primary", teal)).toThrow(
+      /move the seed in the rail/,
+    );
+    expect(() => withRecipe(acme(), "teal", null)).toThrow(
+      /no ramp named "teal"/,
+    );
+  });
+
+  it("add a ramp by name and recipe after the others; the seeds' changes leave it be", () => {
+    const b = withRamp(acme(), "teal", teal);
+    expect(names(b)).toEqual([
+      "primary",
+      "neutral",
+      "red",
+      "harmony-1",
+      "harmony-2",
+      "teal",
+    ]);
+    const t = rampNamed(b, "teal");
+    expect(t.recipe).toEqual(teal);
+    expect(t.seed).not.toBeNull();
+    expect(t.steps[t.seed!]).toEqual(teal.color);
+    const after = withHarmony(
+      withSecondary(withPrimary(b, { L: 0.6, C: 0.2, H: 30 }), amber),
+      "tetradic",
+    );
+    expect(names(after).at(-1)).toBe("teal");
+    expect(names(after)).toContain("secondary");
+    expect(rampNamed(after, "teal").steps).toEqual(t.steps);
+    expect(() => withRecipe(b, "teal", null)).toThrow(
+      /the seeds do not draw it/,
+    );
+    expect(() => withRamp(b, "Teal", teal)).toThrow(/lowercase/);
+    expect(() => withRamp(b, "harmony-9", teal)).toThrow(/the seeds draw/);
+    expect(() => withRamp(b, "secondary", teal)).toThrow(/the seeds draw/);
+    expect(() => withRamp(b, "teal", teal)).toThrow(/already exists/);
+    expect(() =>
+      withRamp(b, "hot", { ...teal, color: { L: 0.9, C: 0.3, H: 250 } }),
+    ).toThrow(/safe chroma/);
+  });
+
+  it("moving an added ramp's seed step moves the color it is drawn through, not the theme's seed", () => {
+    const b = withRamp(acme(), "teal", teal);
+    const i = rampNamed(b, "teal").seed!;
+    const moved = withStep(b, "teal", i, { L: 0.5, C: 0.9, H: 190 });
+    const r = rampNamed(moved, "teal");
+    expect(r.recipe).toEqual({ ...teal, color: r.steps[i] });
+    expect(r.steps[i]!.H).toBe(190);
+    expect(r.steps[i]!.C).toBeLessThan(0.9);
+    expect(moved.primary).toEqual(b.primary);
+    // Redrawing it then draws through the moved color, on the stop nearest its lightness.
+    const fresh = rampNamed(withRecipe(moved, "teal", r.recipe!), "teal");
+    expect(fresh.steps[fresh.seed!]).toEqual(r.steps[i]);
+  });
+
+  it("remove an added ramp while it plays no role; the seeds' ramps stay", () => {
+    const b = withRamp(acme(), "teal", teal);
+    expect(names(withoutRamp(b, "teal"))).not.toContain("teal");
+    expect(() => withoutRamp(withRole(b, "accent", "teal"), "teal")).toThrow(
+      /plays accent/,
+    );
+    expect(() => withoutRamp(b, "red")).toThrow(/cannot be removed/);
+    expect(() => withoutRamp(b, "cyan")).toThrow(/no ramp named "cyan"/);
+  });
+
+  it("drawnRamps is every ramp freshly drawn, by the seeds or by its recipe", () => {
+    const b = withStep(
+      withRecipe(withRamp(acme(), "teal", teal), "red", rose),
+      "teal",
+      3,
+      { L: 0.5, C: 0.1, H: 100 },
+    );
+    const fresh = drawnRamps(b);
+    expect(fresh.map((r) => r.name)).toEqual(names(b));
+    expect(fresh.find((r) => r.name === "teal")!.steps).toEqual(
+      rampNamed(withRamp(acme(), "teal", teal), "teal").steps,
+    );
+    expect(fresh.find((r) => r.name === "red")).toEqual(rampNamed(b, "red"));
+    expect(fresh.find((r) => r.name === "primary")).toEqual(
+      rampNamed(b, "primary"),
+    );
+  });
+
+  it("round-trip through serialize and parse, which names a recipe it cannot read", () => {
+    const b = withRamp(withRecipe(acme(), "red", rose), "teal", teal);
+    expect(parse(serialize(b))).toEqual(b);
+    const ramps = (f: (r: Theme["ramps"][number]) => object) =>
+      JSON.stringify({ ...b, ramps: b.ramps.map((r) => f(r)) });
+    expect(() =>
+      parse(
+        ramps((r) =>
+          r.name === "red"
+            ? { ...r, recipe: { kind: "hue", hue: 10, stops: "chromatic" } }
+            : r,
+        ),
+      ),
+    ).toThrow(/recipe this version cannot read/);
+    expect(() =>
+      parse(ramps((r) => (r.name === "primary" ? { ...r, recipe: rose } : r))),
+    ).toThrow(/takes no recipe/);
+    expect(() =>
+      parse(
+        ramps((r) =>
+          r.name === "teal"
+            ? { name: r.name, steps: r.steps, seed: r.seed }
+            : r,
+        ),
+      ),
+    ).toThrow(/added by hand but has no recipe/);
   });
 });

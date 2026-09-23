@@ -168,7 +168,7 @@ function Strip({ theme }: { theme: Theme }) {
 }
 
 /**
- * The rail: the two seeds and the harmony the ramps are drafted from.
+ * The rail: the two seeds and the harmony the ramps are drawn from.
  * Every change here redraws the ramps it touches and leaves the eye's
  * steps on the others; the ramps themselves are edited in the palette.
  * Each callback answers with a message when the change is refused.

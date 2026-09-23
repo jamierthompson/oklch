@@ -15,7 +15,7 @@ more; every verdict is a report with its standard named. Nothing here signs off.
 ## Three tiers
 
 **Tier 1 — one color or one pair.** Parse, gamut, distance, contrast, the two
-solvers, hue, format. This is the whole package today.
+solvers, hue, format.
 
 **Tier 2 — a list of steps.** `createRamp` drafts one: a hue through Tailwind's
 stops, or a ramp drawn through a seed color so that color is a step exactly,
@@ -23,13 +23,14 @@ chroma a fixed share of what the gamut allows at each step. What comes out is
 steps, indistinguishable from placed ones. `inspectRamp` measures a ramp — drafted
 or placed. `minPass` finds the first step that clears a surface. `createScale`
 is the one continuous thing, for data rather than palettes. Built from Tier 1's
-public surface only; `tests/architecture.test.ts` reads the Tier 2 sources and
-fails if they import anything else.
+public surface only; `tests/architecture.test.ts` reads the Tier 2 and Tier 3
+sources and fails if either imports past the tier below it.
 
 **Tier 3 — a whole system.** `resolveBinding` and `buildTokenSet` bind the
 steps an eye placed to semantic roles, in a light and a dark scheme, with a
 receipt per pairing per scheme. `shadcnBindings` is the one preset: shadcn/ui's
-variables bound to a neutral, a primary, and a destructive ramp, surfaces picked
+variables bound to a neutral, a primary, and a destructive ramp (secondary,
+accent, sidebar, ring, and the chart series may take their own), surfaces picked
 and inks solved, so it clears out of the box for any primary hue and every step is
 still the eye's to move. `auditTokenSet` is the editor's view of the same walk: a
 verdict per token — clears, fails with the check attached, or unresolved by

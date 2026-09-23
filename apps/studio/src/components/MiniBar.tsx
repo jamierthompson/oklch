@@ -2,7 +2,7 @@ import { formatOklch } from "@jamiethompson/oklch";
 
 import { swatchesOf, type Theme } from "@/lib/theme.ts";
 
-/** A theme in one glance: its primary, the secondary's tint, and the first accent, like the prototype's tiles. */
+/** A theme in one glance: its primary, the secondary's tint, and the first accent. */
 export function MiniBar({
   theme,
   className = "",

@@ -30,7 +30,7 @@ export type Command =
       readonly kind: "create";
       readonly index: number;
       readonly theme: Theme;
-      /** Where it came from: a color or a copy of another theme. */
+      /** Where it came from: random seeds, or a copy of another theme. */
       readonly from: string;
       /** The theme that was current before, to return to when the creation is undone. */
       readonly previous: string | null;
@@ -351,7 +351,7 @@ export function peek(s: Studio): { undo: Entry | null; redo: Entry | null } {
 
 /* ---------- reading an entry ---------- */
 
-/** One side of a change, as the activity table shows it: a few words, with a color when there is one. */
+/** One side of a change, as the activity feed shows it: a few words, with a color when there is one. */
 export interface Side {
   readonly text: string;
   readonly color?: OkLCH;

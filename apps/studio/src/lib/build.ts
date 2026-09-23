@@ -69,20 +69,3 @@ export function buildTheme(theme: Theme): Built {
     },
   };
 }
-
-/** Every verdict that is not `clears`, one line each, for a terminal or a log. */
-export function describeFailures(audit: TokenSetAudit): string[] {
-  const lines = [...audit.problems];
-  for (const a of [...audit.light, ...audit.dark]) {
-    const o = a.outcome;
-    if (o.kind === "fails") {
-      lines.push(
-        `${a.scheme}/${a.token} on ${o.on}: WCAG ${o.check.wcag.value.toFixed(2)} against ${o.target.wcag}, ` +
-          `APCA ${o.check.apca.value.toFixed(1)} against ${o.target.apca}; does not clear`,
-      );
-    } else if (o.kind === "unresolved") {
-      lines.push(`${a.scheme}/${a.token}: ${o.reason}`);
-    }
-  }
-  return lines;
-}

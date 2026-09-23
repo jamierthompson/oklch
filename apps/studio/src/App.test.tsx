@@ -97,7 +97,7 @@ describe("App", () => {
     expect(name()).toHaveValue(first);
   });
 
-  it("duplicate lands below the original, and the activity table undoes to here", async () => {
+  it("duplicate lands below the original, and the activity feed undoes to here", async () => {
     render(<App />);
     await menu(PRESETS[0]!.name, "Duplicate");
     expect(name()).toHaveValue(`${PRESETS[0]!.name} copy`);

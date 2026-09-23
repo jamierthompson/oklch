@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { newTheme, withOverride } from "./theme.ts";
-import { buildTheme, describeFailures, slug } from "./build.ts";
+import { buildTheme, slug } from "./build.ts";
 
 const acme = () => newTheme("Acme Corp", "#2563eb", "srgb");
 
@@ -38,11 +38,12 @@ describe("buildTheme", () => {
     const failing = withOverride(acme(), "light", "primary", { step: 1 });
     const built = buildTheme(failing);
     expect(built.outputs).toBeNull();
-    const lines = describeFailures(built.audit);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatch(
-      /^light\/primary on background: WCAG \d\.\d\d against 3, APCA [\d.]+ against 30; does not clear$/,
+    const failures = [...built.audit.light, ...built.audit.dark].filter(
+      (a) => a.outcome.kind !== "clears",
     );
+    expect(failures.map((a) => `${a.scheme}/${a.token}`)).toEqual([
+      "light/primary",
+    ]);
   });
 
   it("slugs a name", () => {

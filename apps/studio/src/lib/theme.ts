@@ -458,9 +458,9 @@ export function withOverride(
 }
 
 /**
- * Move one step. The step a seed sits on is the seed: moving it moves the
- * seed too, kept within the safe chroma so the ramp can still be drawn
- * through it, and nothing else redraws.
+ * Move one step. Nothing else moves: the seeds are the rail's, so the
+ * step a seed was drawn through is a step like any other, and the next
+ * seed change drafts over it.
  */
 export function withStep(
   theme: Theme,
@@ -468,18 +468,11 @@ export function withStep(
   index: number,
   step: OkLCH,
 ): Theme {
-  const ramp = theme.ramps.find((r) => r.name === rampName);
-  const seeded =
-    ramp !== undefined &&
-    ramp.seed === index &&
-    (rampName === "primary" || rampName === "secondary");
-  const placed = seeded ? safeSeed(step, theme.gamut) : step;
   return {
     ...theme,
-    ...(seeded ? { [rampName]: placed } : {}),
     ramps: theme.ramps.map((r) =>
       r.name === rampName
-        ? { ...r, steps: r.steps.map((s, i) => (i === index ? placed : s)) }
+        ? { ...r, steps: r.steps.map((s, i) => (i === index ? step : s)) }
         : r,
     ),
   };

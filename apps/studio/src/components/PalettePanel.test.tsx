@@ -201,23 +201,25 @@ describe("PalettePanel", () => {
     expect(within(row).getByText("solved")).toBeInTheDocument();
   });
 
-  it("the seed step has no reset: it is what the ramp is drawn through", async () => {
+  it("a seed step moved off the seed is marked, and resets to the seed's color", async () => {
     const b = acme();
     const seed = b.ramps.find((r) => r.name === "primary")!.seed!;
-    // Moved far enough that the seeds would anchor on another stop.
-    const moved = withStep(b, "primary", seed, {
-      ...b.ramps.find((r) => r.name === "primary")!.steps[seed]!,
-      L: 0.5,
-    });
+    const moved = withStep(b, "primary", seed, { L: 0.5, C: 0.1, H: 200 });
     const { onStep } = panel(moved);
-    const dialog = await openStep("primary", seed);
-    const reset = dialog.getByRole("button", {
-      name: `reset primary ${STOP_NAMES[seed]}`,
+    const swatch = ramp("primary").getByRole("button", {
+      name: `primary ${STOP_NAMES[seed]}`,
     });
-    expect(reset).toBeDisabled();
-    expect(reset).toHaveAttribute("title", expect.stringMatching(/the seed/));
-    await userEvent.click(reset);
-    expect(onStep).not.toHaveBeenCalled();
+    expect(swatch).toHaveAttribute(
+      "title",
+      expect.stringMatching(/^drawn through the seed, then moved/),
+    );
+    const dialog = await openStep("primary", seed);
+    await userEvent.click(
+      dialog.getByRole("button", {
+        name: `reset primary ${STOP_NAMES[seed]}`,
+      }),
+    );
+    expect(onStep).toHaveBeenCalledWith("primary", seed, b.primary);
   });
 
   it("a step moved on the primary is redrafted by a new primary seed, so there is nothing left to reset", async () => {

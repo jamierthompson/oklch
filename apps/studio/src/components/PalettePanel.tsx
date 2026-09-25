@@ -99,8 +99,9 @@ export function PalettePanel({
         title="Ramps"
         aside={
           <p className="text-xs text-muted-foreground">
-            The outlined step is the seed, exactly. Click a step to move it; a
-            red ring marks a step with a token that does not clear.
+            The outlined step is drawn through the seed; the seed itself is set
+            in the rail. Click a step to move it; a red ring marks a step with a
+            token that does not clear.
           </p>
         }
       >

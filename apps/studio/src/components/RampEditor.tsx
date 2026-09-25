@@ -208,6 +208,12 @@ export function RampEditor({
             const failing = tokens.some((a) => a.outcome.kind !== "clears");
             const isSelected = i === selected;
             const isSeed = ramp.seed === i;
+            // A seed step the eye moved off the seed: still where the seed lands, no longer its color.
+            const offSeed =
+              isSeed &&
+              draft !== null &&
+              draft.steps[i] !== undefined &&
+              !sameColor(s, draft.steps[i]);
             return (
               <PopoverTrigger
                 key={i}
@@ -215,7 +221,11 @@ export function RampEditor({
                 aria-label={`${ramp.name} ${stopName(i)}`}
                 aria-pressed={isSelected}
                 title={
-                  (isSeed ? "the seed, exactly\n" : "") +
+                  (offSeed
+                    ? "drawn through the seed, then moved\n"
+                    : isSeed
+                      ? "the seed, exactly\n"
+                      : "") +
                   (tokens.length === 0
                     ? "No token lands here"
                     : tokens.map((a) => `${a.scheme} ${a.token}`).join("\n"))
@@ -229,9 +239,11 @@ export function RampEditor({
                       ? "w-full ring-2 ring-ring ring-offset-2 ring-offset-background"
                       : failing
                         ? "w-full ring-2 ring-destructive ring-offset-1 ring-offset-background"
-                        : isSeed
-                          ? "w-full ring-2 ring-foreground ring-offset-1 ring-offset-background"
-                          : "w-full"
+                        : offSeed
+                          ? "w-full outline-2 outline-offset-1 outline-foreground outline-dashed"
+                          : isSeed
+                            ? "w-full ring-2 ring-foreground ring-offset-1 ring-offset-background"
+                            : "w-full"
                   }
                 />
                 <span className="block text-center text-[10px] text-muted-foreground">
@@ -299,9 +311,7 @@ function StepDetail({
   onShowToken: (a: TokenAudit) => void;
   onStep: (index: number, step: OkLCH) => void;
 }) {
-  // The seed step is what the ramp is drawn through: nothing to put it back to.
-  const isSeed = ramp.seed === index;
-  const moved = !isSeed && draft !== null && !sameColor(step, draft);
+  const moved = draft !== null && !sameColor(step, draft);
   return (
     <div className="grid gap-2">
       <PopoverHeader>
@@ -312,11 +322,9 @@ function StepDetail({
           <ResetButton
             label={`reset ${ramp.name} ${stopName(index)}`}
             title={
-              isSeed
-                ? "This step is the seed the ramp is drawn through"
-                : moved
-                  ? "Put this step back where the seeds draft it"
-                  : "This step sits where the seeds draft it"
+              moved
+                ? "Put this step back where the seeds draft it"
+                : "This step sits where the seeds draft it"
             }
             disabled={!moved}
             onClick={() => draft !== null && onStep(index, draft)}

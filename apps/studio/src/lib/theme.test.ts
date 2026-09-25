@@ -110,28 +110,27 @@ describe("roles", () => {
 });
 
 describe("the seed step", () => {
-  it("is the seed: moving it moves the seed, within the safe chroma, and nothing else redraws", () => {
+  it("is a step like any other: moving it leaves the seed alone, and the seed drafts over it again", () => {
     const b = withSecondary(acme(), amber);
     const seed = rampNamed(b, "primary").seed!;
     const harmonyBefore = rampNamed(b, "harmony-1").steps;
-    const moved = withStep(b, "primary", seed, { L: 0.5, C: 0.9, H: 200 });
-    const step = rampNamed(moved, "primary").steps[seed]!;
-    expect(moved.primary).toEqual(step);
-    expect(step.H).toBe(200);
-    expect(step.C).toBeLessThan(0.9);
+    const blue = { L: 0.5, C: 0.1, H: 200 };
+    const moved = withStep(b, "primary", seed, blue);
+    expect(rampNamed(moved, "primary").steps[seed]).toEqual(blue);
+    expect(moved.primary).toEqual(b.primary);
     expect(rampNamed(moved, "harmony-1").steps).toBe(harmonyBefore);
-    // Other steps of the ramp, and the secondary's seed step, do the same.
-    const other = withStep(moved, "primary", seed + 1, {
-      L: 0.4,
-      C: 0.1,
-      H: 200,
-    });
-    expect(other.primary).toEqual(step);
+    // The secondary's seed step does the same.
     const s2 = rampNamed(b, "secondary").seed!;
-    const sec = withStep(b, "secondary", s2, { L: 0.6, C: 0.1, H: 80 });
-    expect(sec.secondary).toEqual(rampNamed(sec, "secondary").steps[s2]);
-    // And a harmony change after the move still drafts, since the seed stayed safe.
-    expect(() => withHarmony(moved, "triadic")).not.toThrow();
+    const sec = withStep(b, "secondary", s2, blue);
+    expect(sec.secondary).toEqual(amber);
+    expect(rampNamed(sec, "secondary").steps[s2]).toEqual(blue);
+    // A new seed puts the seed's color back on its step.
+    const reseeded = withPrimary(moved, b.primary);
+    expect(rampNamed(reseeded, "primary").steps[seed]).toEqual(b.primary);
+    // And a harmony change leaves the moved step where the eye put it.
+    expect(
+      rampNamed(withHarmony(moved, "triadic"), "primary").steps[seed],
+    ).toEqual(blue);
   });
 });
 

@@ -10,7 +10,6 @@ import {
   withPrimary,
   withRole,
   withSecondary,
-  withStep,
   type Theme,
   type HarmonyKind,
   type Override,
@@ -177,11 +176,7 @@ export function useStudio() {
       on(null, (b) => {
         const from = b.ramps.find((r) => r.name === ramp)?.steps[index];
         if (from === undefined) throw new Error(`no step ${index} on ${ramp}`);
-        // The step as it lands: a seed step is kept within the safe chroma.
-        const placed = withStep(b, ramp, index, to).ramps.find(
-          (r) => r.name === ramp,
-        )!.steps[index]!;
-        return { kind: "step", ramp, index, from, to: placed };
+        return { kind: "step", ramp, index, from, to };
       }),
     [on],
   );

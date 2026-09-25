@@ -4,13 +4,24 @@ import {
   type OkLCH,
   type TokenAudit,
 } from "@jamiethompson/oklch";
+import { RotateCcw } from "lucide-react";
 import { useMemo } from "react";
 
 import { Field } from "@/components/Field.tsx";
 import { Swatch } from "@/components/Swatch.tsx";
 import { Verdict } from "@/components/Verdict.tsx";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  draftRamps,
   rampOf,
   ROLES,
   type Theme,
@@ -37,19 +48,66 @@ function subtitleOf(theme: Theme, ramp: ThemeRamp): string {
   return `${offset > 0 ? "+" : ""}${offset}° → ${hue}`;
 }
 
+/** The id of a step's button, which the popover anchors to. */
+const stepId = (ramp: string, index: number) => `ramp-${ramp}-step-${index}`;
+
+const sameColor = (a: OkLCH, b: OkLCH) =>
+  a.L === b.L && a.C === b.C && a.H === b.H;
+
 /**
- * One ramp: its roles, its steps, and the step the eye has selected, with
- * every token that lands on that step and each one's verdict on its own
- * surface. The roles are how a ramp reaches the tokens: a token's ramp is
- * its role's, so a ramp that plays nothing colors nothing. The sliders
- * move the selected step; the seeds in the rail redraw the ramp.
+ * The ramp as the seeds draft it now, for a step to reset to. Null for a
+ * ramp the seeds can no longer draw.
+ */
+function draftOf(theme: Theme, ramp: ThemeRamp): ThemeRamp | null {
+  try {
+    return draftRamps(theme).find((r) => r.name === ramp.name) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** A round-arrow icon button: put something back where it was drawn. */
+function ResetButton({
+  label,
+  title,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  title: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className="-mt-1 -mr-1"
+      aria-label={label}
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <RotateCcw />
+    </Button>
+  );
+}
+
+/**
+ * One ramp: its roles, its steps, and a popover. Every step is a trigger
+ * for the popover, which holds the selected step's sliders and the tokens
+ * that land on it with each one's verdict. The roles are how a ramp
+ * reaches the tokens: a token's ramp is its role's, so a ramp that plays
+ * nothing colors nothing.
  */
 export function RampEditor({
   theme,
   ramp,
   usage,
   selected,
+  open,
   onSelect,
+  onClose,
   onShowToken,
   onRole,
   onStep,
@@ -59,7 +117,12 @@ export function RampEditor({
   usage: Usage;
   /** The selected step, when the selection is on this ramp. */
   selected: number | null;
+  /** Whether the selected step's popover is open. */
+  open: boolean;
+  /** Select a step and open its popover. */
   onSelect: (step: number) => void;
+  /** The popover closed; the selection stays. */
+  onClose: () => void;
   onShowToken: (a: TokenAudit) => void;
   /** Give this ramp a role. */
   onRole: (role: Role) => void;
@@ -69,8 +132,11 @@ export function RampEditor({
     () => inspectRamp(ramp.steps, theme.gamut),
     [ramp.steps, theme.gamut],
   );
+  const draft = useMemo(() => draftOf(theme, ramp), [theme, ramp]);
   const onStepTokens = (i: number) =>
     usedBy(usage, { ramp: ramp.name, step: i });
+  const step = selected === null ? undefined : ramp.steps[selected];
+  const isOpen = open && step !== undefined;
 
   return (
     <section
@@ -116,77 +182,96 @@ export function RampEditor({
         </div>
       </div>
 
-      <div
-        className="flex gap-1"
-        role="group"
-        aria-label={`${ramp.name} steps`}
-      >
-        {ramp.steps.map((s, i) => {
-          const tokens = onStepTokens(i);
-          const failing = tokens.some((a) => a.outcome.kind !== "clears");
-          const isSelected = i === selected;
-          const isSeed = ramp.seed === i;
-          return (
-            <button
-              key={i}
-              type="button"
-              aria-label={`${ramp.name} ${stopName(i)}`}
-              aria-pressed={isSelected}
-              title={
-                (isSeed ? "the seed, exactly\n" : "") +
-                (tokens.length === 0
-                  ? "No token lands here"
-                  : tokens.map((a) => `${a.scheme} ${a.token}`).join("\n"))
-              }
-              onClick={() => onSelect(i)}
-              className="min-w-0 flex-1"
-            >
-              <Swatch
-                color={s}
-                className={
-                  isSelected
-                    ? "w-full ring-2 ring-ring ring-offset-2 ring-offset-background"
-                    : failing
-                      ? "w-full ring-2 ring-destructive ring-offset-1 ring-offset-background"
-                      : isSeed
-                        ? "w-full ring-2 ring-foreground ring-offset-1 ring-offset-background"
-                        : "w-full"
-                }
-              />
-              <span className="block text-center text-[10px] text-muted-foreground">
-                {stopName(i)}
-                {isSeed ? " ·" : ""}
-              </span>
-              <span
-                className={
-                  "block min-h-3.5 text-center text-[10px] " +
-                  (failing ? "text-destructive" : "text-muted-foreground")
-                }
-                aria-label={
-                  tokens.length === 0
-                    ? `no token on ${ramp.name} ${stopName(i)}`
-                    : `${tokens.length} token${tokens.length === 1 ? "" : "s"} on ${ramp.name} ${stopName(i)}`
-                }
-              >
-                {tokens.length > 0 ? tokens.length : " "}
-              </span>
-            </button>
+      <Popover
+        open={isOpen}
+        triggerId={selected === null ? null : stepId(ramp.name, selected)}
+        onOpenChange={(next, details) => {
+          if (!next) {
+            onClose();
+            return;
+          }
+          // Pressing any step, even while open, brings the popover to it.
+          const id = details.trigger?.id;
+          const index = ramp.steps.findIndex(
+            (_, i) => stepId(ramp.name, i) === id,
           );
-        })}
-      </div>
+          onSelect(index === -1 ? (selected ?? 0) : index);
+        }}
+      >
+        <div
+          className="flex gap-1"
+          role="group"
+          aria-label={`${ramp.name} steps`}
+        >
+          {ramp.steps.map((s, i) => {
+            const tokens = onStepTokens(i);
+            const failing = tokens.some((a) => a.outcome.kind !== "clears");
+            const isSelected = i === selected;
+            const isSeed = ramp.seed === i;
+            return (
+              <PopoverTrigger
+                key={i}
+                id={stepId(ramp.name, i)}
+                aria-label={`${ramp.name} ${stopName(i)}`}
+                aria-pressed={isSelected}
+                title={
+                  (isSeed ? "the seed, exactly\n" : "") +
+                  (tokens.length === 0
+                    ? "No token lands here"
+                    : tokens.map((a) => `${a.scheme} ${a.token}`).join("\n"))
+                }
+                className="min-w-0 flex-1 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                <Swatch
+                  color={s}
+                  className={
+                    isSelected
+                      ? "w-full ring-2 ring-ring ring-offset-2 ring-offset-background"
+                      : failing
+                        ? "w-full ring-2 ring-destructive ring-offset-1 ring-offset-background"
+                        : isSeed
+                          ? "w-full ring-2 ring-foreground ring-offset-1 ring-offset-background"
+                          : "w-full"
+                  }
+                />
+                <span className="block text-center text-[10px] text-muted-foreground">
+                  {stopName(i)}
+                  {isSeed ? " ·" : ""}
+                </span>
+                <span
+                  className={
+                    "block min-h-3.5 text-center text-[10px] " +
+                    (failing ? "text-destructive" : "text-muted-foreground")
+                  }
+                  aria-label={
+                    tokens.length === 0
+                      ? `no token on ${ramp.name} ${stopName(i)}`
+                      : `${tokens.length} token${tokens.length === 1 ? "" : "s"} on ${ramp.name} ${stopName(i)}`
+                  }
+                >
+                  {tokens.length > 0 ? tokens.length : " "}
+                </span>
+              </PopoverTrigger>
+            );
+          })}
+        </div>
 
-      {selected !== null && ramp.steps[selected] !== undefined && (
-        <StepDetail
-          theme={theme}
-          ramp={ramp}
-          index={selected}
-          step={ramp.steps[selected]}
-          inspected={report.steps[selected]!}
-          tokens={onStepTokens(selected)}
-          onShowToken={onShowToken}
-          onStep={onStep}
-        />
-      )}
+        {selected !== null && step !== undefined && (
+          <PopoverContent className="w-96 max-w-[calc(100vw-2rem)] max-h-(--available-height) overflow-y-auto">
+            <StepDetail
+              theme={theme}
+              ramp={ramp}
+              index={selected}
+              step={step}
+              inspected={report.steps[selected]!}
+              tokens={onStepTokens(selected)}
+              draft={draft?.steps[selected] ?? null}
+              onShowToken={onShowToken}
+              onStep={onStep}
+            />
+          </PopoverContent>
+        )}
+      </Popover>
     </section>
   );
 }
@@ -199,6 +284,7 @@ function StepDetail({
   step,
   inspected,
   tokens,
+  draft,
   onShowToken,
   onStep,
 }: {
@@ -208,19 +294,43 @@ function StepDetail({
   step: OkLCH;
   inspected: ReturnType<typeof inspectRamp>["steps"][number];
   tokens: readonly TokenAudit[];
+  /** Where the seeds draft this step, to reset to; null when they cannot draw it. */
+  draft: OkLCH | null;
   onShowToken: (a: TokenAudit) => void;
   onStep: (index: number, step: OkLCH) => void;
 }) {
+  // The seed step is what the ramp is drawn through: nothing to put it back to.
+  const isSeed = ramp.seed === index;
+  const moved = !isSeed && draft !== null && !sameColor(step, draft);
   return (
-    <div className="grid gap-2" aria-label={`${ramp.name} ${stopName(index)}`}>
-      <div className="text-xs text-muted-foreground">
-        step {stopName(index)} · chroma {fixed(inspected.chromaShare * 100, 0)}%
-        of what {theme.gamut} allows
-        {inspected.onCusp ? " · on the cusp" : ""}
-        {inspected.map.moved
-          ? ` · mapped into ${theme.gamut}, ΔE ${fixed(inspected.map.deltaEOK)}`
-          : ""}
-      </div>
+    <div className="grid gap-2">
+      <PopoverHeader>
+        <div className="flex items-start justify-between gap-2">
+          <PopoverTitle>
+            {ramp.name} {stopName(index)}
+          </PopoverTitle>
+          <ResetButton
+            label={`reset ${ramp.name} ${stopName(index)}`}
+            title={
+              isSeed
+                ? "This step is the seed the ramp is drawn through"
+                : moved
+                  ? "Put this step back where the seeds draft it"
+                  : "This step sits where the seeds draft it"
+            }
+            disabled={!moved}
+            onClick={() => draft !== null && onStep(index, draft)}
+          />
+        </div>
+        <PopoverDescription className="text-xs">
+          chroma {fixed(inspected.chromaShare * 100, 0)}% of what {theme.gamut}{" "}
+          allows
+          {inspected.onCusp ? " · on the cusp" : ""}
+          {inspected.map.moved
+            ? ` · mapped into ${theme.gamut}, ΔE ${fixed(inspected.map.deltaEOK)}`
+            : ""}
+        </PopoverDescription>
+      </PopoverHeader>
       <Field
         label="L"
         value={step.L}
@@ -257,14 +367,15 @@ function StepDetail({
             key={`${a.scheme}/${a.token}`}
             className="flex flex-wrap items-center gap-2 text-xs"
           >
-            <button
-              type="button"
-              className="font-mono underline-offset-4 hover:underline"
+            <Button
+              variant="link"
+              size="xs"
+              className="h-auto px-0 font-mono text-xs"
               title="Show this token in the table"
               onClick={() => onShowToken(a)}
             >
               {a.scheme} · {a.token}
-            </button>
+            </Button>
             <span className="text-muted-foreground">{howOf(theme, a)}</span>
             <Verdict a={a} />
           </div>

@@ -63,6 +63,8 @@ export function PalettePanel({
   actions: PaletteActions;
 }) {
   const [selected, setSelected] = useState<StepRef | null>(null);
+  /** Whether the selected step's popover is open. The selection outlives it. */
+  const [open, setOpen] = useState(false);
   const usage = useMemo(() => usageOf(audit), [audit]);
 
   // A selection that names a ramp the theme no longer has falls back.
@@ -74,11 +76,19 @@ export function PalettePanel({
         ? null
         : { ramp: primary.name, step: primary.seed ?? DEFAULT_STEP };
 
-  const locate = (ref: StepRef) => {
+  const select = (ref: StepRef) => {
     setSelected(ref);
+    setOpen(true);
+  };
+  const locate = (ref: StepRef) => {
+    select(ref);
     scrollTo(`ramp-${ref.ramp}`);
   };
-  const showToken = (a: TokenAudit) => scrollTo(tokenCellId(a.scheme, a.token));
+  // The popover would follow its step off the screen; the table is what to look at now.
+  const showToken = (a: TokenAudit) => {
+    setOpen(false);
+    scrollTo(tokenCellId(a.scheme, a.token));
+  };
   const failing = [...audit.light, ...audit.dark].filter(
     (a) => a.outcome.kind !== "clears",
   ).length;
@@ -89,7 +99,7 @@ export function PalettePanel({
         title="Ramps"
         aside={
           <p className="text-xs text-muted-foreground">
-            The outlined step is the seed, exactly. Select a step to move it; a
+            The outlined step is the seed, exactly. Click a step to move it; a
             red ring marks a step with a token that does not clear.
           </p>
         }
@@ -101,7 +111,9 @@ export function PalettePanel({
             ramp={ramp}
             usage={usage}
             selected={selection?.ramp === ramp.name ? selection.step : null}
-            onSelect={(step) => setSelected({ ramp: ramp.name, step })}
+            open={open && selection?.ramp === ramp.name}
+            onSelect={(step) => select({ ramp: ramp.name, step })}
+            onClose={() => setOpen(false)}
             onShowToken={showToken}
             onRole={(role) => actions.onRole(role, ramp.name)}
             onStep={(i, s) => actions.onStep(ramp.name, i, s)}

@@ -1,14 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseColor } from "@jamiethompson/oklch";
-
-import {
-  newTheme,
-  safeSeed,
-  withRamp,
-  withRecipe,
-  type Theme,
-} from "./theme.ts";
+import { newTheme, type Theme } from "./theme.ts";
 import {
   canRedo,
   canUndo,
@@ -332,112 +324,5 @@ describe("describe", () => {
         }),
       ),
     ).toBe("Acme · Created · Kansas City Chiefs");
-  });
-});
-
-describe("ramps", () => {
-  const teal = {
-    kind: "through",
-    color: safeSeed(parseColor("#14b8a6")!, "srgb"),
-    stops: "chromatic",
-  } as const;
-  const own = {
-    kind: "hue",
-    hue: 180,
-    saturation: 0.5,
-    stops: "chromatic",
-  } as const;
-  const rampNames = (s: Studio) => currentOf(s)!.ramps.map((r) => r.name);
-  const tealOf = (s: Studio) =>
-    currentOf(s)!.ramps.find((r) => r.name === "teal");
-
-  it("adds, redraws and removes a ramp, each undoable and redoable", () => {
-    const a = acme();
-    let s = create(EMPTY, a);
-    const added = withRamp(a, "teal", teal).ramps.at(-1)!;
-    s = perform(s, entry(a, { kind: "add-ramp", index: 5, ramp: added }, 1000));
-    expect(rampNames(s).at(-1)).toBe("teal");
-    const redrawn = withRecipe(currentOf(s)!, "teal", own).ramps.at(-1)!;
-    s = perform(
-      s,
-      entry(
-        a,
-        { kind: "redraw", ramp: "teal", from: added, to: redrawn },
-        3000,
-      ),
-    );
-    expect(tealOf(s)!.recipe).toEqual(own);
-    s = perform(
-      s,
-      entry(a, { kind: "remove-ramp", index: 5, ramp: redrawn }, 5000),
-    );
-    expect(rampNames(s)).not.toContain("teal");
-    s = undo(s);
-    expect(tealOf(s)!.recipe).toEqual(own);
-    s = undo(s);
-    expect(tealOf(s)!.recipe).toEqual(teal);
-    s = undo(s);
-    expect(rampNames(s)).not.toContain("teal");
-    s = redo(s);
-    s = redo(s);
-    s = redo(s);
-    expect(rampNames(s)).not.toContain("teal");
-    expect(canRedo(s)).toBe(false);
-  });
-
-  it("redraws of the same ramp within the window are one entry, from the first to the last", () => {
-    const a = acme();
-    let s = create(EMPTY, a);
-    const red = currentOf(s)!.ramps.find((r) => r.name === "red")!;
-    const at = (hue: number) =>
-      withRecipe(currentOf(s)!, "red", { ...own, hue }).ramps.find(
-        (r) => r.name === "red",
-      )!;
-    const first = at(10);
-    s = perform(
-      s,
-      entry(a, { kind: "redraw", ramp: "red", from: red, to: first }, 1000),
-    );
-    const second = at(20);
-    s = perform(
-      s,
-      entry(a, { kind: "redraw", ramp: "red", from: first, to: second }, 1500),
-    );
-    expect(s.log).toHaveLength(2);
-    expect(s.log.at(-1)!.command).toMatchObject({
-      kind: "redraw",
-      from: red,
-      to: second,
-    });
-    s = undo(s);
-    expect(currentOf(s)!.ramps.find((r) => r.name === "red")).toEqual(red);
-  });
-
-  it("reads a redraw by its recipes, and an added or removed ramp by name", () => {
-    const a = acme();
-    const red = a.ramps.find((r) => r.name === "red")!;
-    const d = describeCommand({
-      kind: "redraw",
-      ramp: "red",
-      from: red,
-      to: { ...red, recipe: { ...own, hue: 10, saturation: 0.9 } },
-    });
-    expect(d.change).toBe("red redrawn");
-    expect(d.was.text).toBe("the seeds");
-    expect(d.now.text).toBe("hue 10°, 90% chroma");
-    expect(
-      describeCommand({
-        kind: "redraw",
-        ramp: "teal",
-        from: { ...red, name: "teal", recipe: teal },
-        to: { ...red, name: "teal", recipe: { ...teal, stops: "neutral" } },
-      }).now,
-    ).toEqual({ text: "through #14b8a6, neutral stops", color: teal.color });
-    expect(summarize(entry(a, { kind: "add-ramp", index: 5, ramp: red }))).toBe(
-      "Acme · Added ramp · red",
-    );
-    expect(
-      describeCommand({ kind: "remove-ramp", index: 5, ramp: red }),
-    ).toMatchObject({ change: "Removed ramp", was: { text: "red" } });
   });
 });

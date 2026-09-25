@@ -4,32 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PalettePanel, type PaletteActions } from "./PalettePanel.tsx";
 import { STOP_NAMES } from "@/lib/format.ts";
-import {
-  auditOf,
-  newTheme,
-  safeSeed,
-  withOverride,
-  withRamp,
-  withRecipe,
-  withRole,
-  type Recipe,
-  type Theme,
-} from "@/lib/theme.ts";
-import { parseColor } from "@jamiethompson/oklch";
+import { auditOf, newTheme, withOverride, type Theme } from "@/lib/theme.ts";
 
 const acme = () => newTheme("Acme", "#2563eb", "srgb");
-const teal: Recipe = {
-  kind: "through",
-  color: safeSeed(parseColor("#14b8a6")!, "srgb"),
-  stops: "chromatic",
-};
 const panel = (theme: Theme) => {
   const actions = {
     onStep: vi.fn<PaletteActions["onStep"]>(),
     onRole: vi.fn<PaletteActions["onRole"]>(),
-    onRedraw: vi.fn<PaletteActions["onRedraw"]>(() => null),
-    onAddRamp: vi.fn<PaletteActions["onAddRamp"]>(() => null),
-    onRemoveRamp: vi.fn<PaletteActions["onRemoveRamp"]>(() => null),
     onOverride: vi.fn<PaletteActions["onOverride"]>(),
   };
   render(
@@ -50,11 +31,11 @@ describe("PalettePanel", () => {
       expect(
         screen.getByRole("region", { name: `ramp ${name}` }),
       ).toBeVisible();
-    // The seeds' ramps cannot be removed; a ramp can be added.
+    // No ramp is added or removed here: the seeds draw them all.
+    expect(screen.queryByLabelText("add ramp")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Remove" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "add ramp" })).toBeVisible();
     const neutral = ramp("neutral");
     expect(
       neutral.getByRole("button", { name: "neutral role on neutral" }),
@@ -169,134 +150,5 @@ describe("PalettePanel", () => {
     );
     const row = onStep.getByText("light · foreground").parentElement!;
     expect(within(row).getByText("solved")).toBeInTheDocument();
-  });
-
-  it("adding a ramp asks for it by name, drawn through the color typed", async () => {
-    const { onAddRamp } = panel(acme());
-    const add = within(screen.getByRole("region", { name: "add ramp" }));
-    const draw = add.getByRole("button", { name: "Draw" });
-    expect(draw).toBeDisabled();
-    await userEvent.type(add.getByLabelText("Add a ramp"), "teal");
-    await userEvent.type(add.getByLabelText("Through a color"), "not a color");
-    await userEvent.click(draw);
-    expect(add.getByText('"not a color" is not a color')).toBeInTheDocument();
-    expect(onAddRamp).not.toHaveBeenCalled();
-    await userEvent.clear(add.getByLabelText("Through a color"));
-    await userEvent.type(add.getByLabelText("Through a color"), "#14b8a6");
-    await userEvent.click(draw);
-    expect(onAddRamp).toHaveBeenCalledWith("teal", {
-      kind: "through",
-      color: parseColor("#14b8a6"),
-      stops: "chromatic",
-    });
-    // The form clears once the ramp is taken.
-    expect(add.getByLabelText("Add a ramp")).toHaveValue("");
-  });
-
-  it("a refused ramp says why, and the form keeps what was typed", async () => {
-    const { onAddRamp } = panel(acme());
-    onAddRamp.mockReturnValue('a ramp named "teal" already exists');
-    const add = within(screen.getByRole("region", { name: "add ramp" }));
-    await userEvent.type(add.getByLabelText("Add a ramp"), "teal");
-    await userEvent.type(add.getByLabelText("Through a color"), "#14b8a6");
-    await userEvent.click(add.getByRole("button", { name: "Draw" }));
-    expect(
-      add.getByText('a ramp named "teal" already exists'),
-    ).toBeInTheDocument();
-    expect(add.getByLabelText("Add a ramp")).toHaveValue("teal");
-  });
-
-  it("the redraw drawer redraws a seeds' ramp by a recipe of the eye's, and hands it back", async () => {
-    const { onRedraw } = panel(acme());
-    const red = ramp("red");
-    await userEvent.click(red.getByText("Redraw the ramp"));
-    const drawer = within(red.getByRole("group", { name: "redraw red" }));
-    expect(drawer.getByText(/Drawn by the seeds/)).toBeInTheDocument();
-    expect(
-      drawer.queryByRole("button", { name: "Back to the seeds" }),
-    ).not.toBeInTheDocument();
-    fireEvent.change(drawer.getByLabelText("hue value"), {
-      target: { value: "10" },
-    });
-    expect(onRedraw).toHaveBeenLastCalledWith("red", {
-      kind: "hue",
-      hue: 10,
-      saturation: 0.85,
-      stops: "chromatic",
-    });
-    // Redraw runs the recipe as it stands, dropping the eye's moves.
-    await userEvent.click(drawer.getByRole("button", { name: "Redraw" }));
-    expect(onRedraw).toHaveBeenLastCalledWith("red", {
-      kind: "hue",
-      hue: 25,
-      saturation: 0.85,
-      stops: "chromatic",
-    });
-  });
-
-  it("a ramp the eye redrew says so and can go back to the seeds", async () => {
-    const own: Recipe = {
-      kind: "hue",
-      hue: 10,
-      saturation: 0.9,
-      stops: "chromatic",
-    };
-    const { onRedraw } = panel(withRecipe(acme(), "red", own));
-    const red = ramp("red");
-    await userEvent.click(red.getByText("Redraw the ramp"));
-    const drawer = within(red.getByRole("group", { name: "redraw red" }));
-    expect(drawer.getByText(/Drawn by hand/)).toBeInTheDocument();
-    await userEvent.click(
-      drawer.getByRole("button", { name: "Back to the seeds" }),
-    );
-    expect(onRedraw).toHaveBeenLastCalledWith("red", null);
-  });
-
-  it("the primary is drawn through its seed: its drawer only redraws from the seed", async () => {
-    const { onRedraw } = panel(acme());
-    const primary = ramp("primary");
-    await userEvent.click(primary.getByText("Redraw the ramp"));
-    const drawer = within(
-      primary.getByRole("group", { name: "redraw primary" }),
-    );
-    expect(drawer.queryByLabelText("hue value")).not.toBeInTheDocument();
-    await userEvent.click(
-      drawer.getByRole("button", { name: "Redraw from the seed" }),
-    );
-    expect(onRedraw).toHaveBeenCalledWith("primary", null);
-  });
-
-  it("an added ramp can be removed, unless it plays a role", async () => {
-    const added = withRamp(acme(), "teal", teal);
-    const { onRemoveRamp } = panel(added);
-    const tealRamp = ramp("teal");
-    await userEvent.click(tealRamp.getByText("Redraw the ramp"));
-    const drawer = within(tealRamp.getByRole("group", { name: "redraw teal" }));
-    expect(drawer.getByText(/Added by hand/)).toBeInTheDocument();
-    expect(
-      drawer.queryByRole("button", { name: "Back to the seeds" }),
-    ).not.toBeInTheDocument();
-    await userEvent.click(drawer.getByRole("button", { name: "Remove" }));
-    expect(onRemoveRamp).toHaveBeenCalledWith("teal");
-  });
-
-  it("an added ramp that plays a role cannot be removed until the role moves", async () => {
-    const { onRemoveRamp } = panel(
-      withRole(withRamp(acme(), "teal", teal), "accent", "teal"),
-    );
-    const tealRamp = ramp("teal");
-    expect(
-      tealRamp.getByRole("button", { name: "accent role on teal" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(tealRamp.getByText("Redraw the ramp"));
-    const remove = within(
-      tealRamp.getByRole("group", { name: "redraw teal" }),
-    ).getByRole("button", { name: "Remove" });
-    expect(remove).toBeDisabled();
-    expect(remove).toHaveAttribute(
-      "title",
-      expect.stringMatching(/plays accent/),
-    );
-    expect(onRemoveRamp).not.toHaveBeenCalled();
   });
 });

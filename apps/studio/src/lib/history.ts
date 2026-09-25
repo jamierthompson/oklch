@@ -18,7 +18,6 @@ import {
   type ThemeRamp,
   type HarmonyKind,
   type Override,
-  type Recipe,
   type Role,
   type Scheme,
 } from "@/lib/theme.ts";
@@ -50,23 +49,6 @@ export type Command =
       readonly role: Role;
       readonly from: string | null;
       readonly to: string;
-    }
-  | {
-      /** A ramp redrawn: by the eye's recipe, or by the seeds' again. */
-      readonly kind: "redraw";
-      readonly ramp: string;
-      readonly from: ThemeRamp;
-      readonly to: ThemeRamp;
-    }
-  | {
-      readonly kind: "add-ramp";
-      readonly index: number;
-      readonly ramp: ThemeRamp;
-    }
-  | {
-      readonly kind: "remove-ramp";
-      readonly index: number;
-      readonly ramp: ThemeRamp;
     }
   | {
       readonly kind: "override";
@@ -104,9 +86,6 @@ export const KINDS: readonly Command["kind"][] = [
   "rename",
   "step",
   "role",
-  "redraw",
-  "add-ramp",
-  "remove-ramp",
   "override",
   "primary",
   "secondary",
@@ -165,27 +144,6 @@ function onTheme(theme: Theme, c: Command, forward: boolean): Theme {
       else assignment[c.role] = v;
       return { ...theme, assignment };
     }
-    case "redraw": {
-      const ramp = forward ? c.to : c.from;
-      return {
-        ...theme,
-        ramps: theme.ramps.map((r) => (r.name === c.ramp ? ramp : r)),
-      };
-    }
-    case "add-ramp":
-    case "remove-ramp": {
-      const adds = c.kind === "add-ramp" ? forward : !forward;
-      return {
-        ...theme,
-        ramps: adds
-          ? insertRamp(
-              theme.ramps.filter((r) => r.name !== c.ramp.name),
-              c.index,
-              c.ramp,
-            )
-          : theme.ramps.filter((r) => r.name !== c.ramp.name),
-      };
-    }
     case "override":
       return withOverride(theme, c.scheme, c.token, forward ? c.to : c.from);
     case "primary":
@@ -217,15 +175,6 @@ function onTheme(theme: Theme, c: Command, forward: boolean): Theme {
 function insert(themes: readonly Theme[], index: number, b: Theme): Theme[] {
   const i = Math.max(0, Math.min(index, themes.length));
   return [...themes.slice(0, i), b, ...themes.slice(i)];
-}
-
-function insertRamp(
-  ramps: readonly ThemeRamp[],
-  index: number,
-  r: ThemeRamp,
-): ThemeRamp[] {
-  const i = Math.max(0, Math.min(index, ramps.length));
-  return [...ramps.slice(0, i), r, ...ramps.slice(i)];
 }
 
 /** The theme to land on when the one at `index` is gone: the one that took its place, else the one above, else none. */
@@ -279,8 +228,6 @@ function sameTarget(a: Command, b: Command): boolean {
   switch (a.kind) {
     case "step":
       return b.kind === "step" && a.ramp === b.ramp && a.index === b.index;
-    case "redraw":
-      return b.kind === "redraw" && a.ramp === b.ramp;
     case "primary":
     case "secondary":
     case "rename":
@@ -294,8 +241,6 @@ function merged(prev: Command, next: Command): Command {
   switch (prev.kind) {
     case "step":
       return next.kind === "step" ? { ...next, from: prev.from } : next;
-    case "redraw":
-      return next.kind === "redraw" ? { ...next, from: prev.from } : next;
     case "rename":
       return next.kind === "rename" ? { ...next, from: prev.from } : next;
     case "primary":
@@ -322,7 +267,6 @@ function isNoop(c: Command): boolean {
     case "gamut":
     case "override":
     case "role":
-    case "redraw":
       return json(c.from) === json(c.to);
     default:
       return false;
@@ -429,19 +373,6 @@ const overrideText = (o: Override | null): string =>
       ? `solve from ${o.from}`
       : (STOP_NAMES[o.step] ?? String(o.step));
 
-/** A recipe in a few words, or how the seeds draw the ramp when it has none. */
-export function recipeText(recipe: Recipe | undefined): string {
-  if (recipe === undefined) return "the seeds";
-  const stops = recipe.stops === "neutral" ? ", neutral stops" : "";
-  return recipe.kind === "through"
-    ? `through ${formatHex(recipe.color).hex}${stops}`
-    : `hue ${fixed(recipe.hue, 0)}°, ${fixed(recipe.saturation * 100, 0)}% chroma${stops}`;
-}
-const recipeSide = (r: ThemeRamp): Side => ({
-  text: recipeText(r.recipe),
-  ...(r.recipe?.kind === "through" ? { color: r.recipe.color } : {}),
-});
-
 export function describe(c: Command): Description {
   switch (c.kind) {
     case "create":
@@ -475,24 +406,6 @@ export function describe(c: Command): Description {
         change: `${c.role} role`,
         was: { text: c.from ?? "default" },
         now: { text: c.to },
-      };
-    case "redraw":
-      return {
-        change: `${c.ramp} redrawn`,
-        was: recipeSide(c.from),
-        now: recipeSide(c.to),
-      };
-    case "add-ramp":
-      return {
-        change: "Added ramp",
-        was: { text: "" },
-        now: { text: c.ramp.name },
-      };
-    case "remove-ramp":
-      return {
-        change: "Removed ramp",
-        was: { text: c.ramp.name },
-        now: { text: "" },
       };
     case "override":
       return {

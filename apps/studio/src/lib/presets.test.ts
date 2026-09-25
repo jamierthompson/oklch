@@ -1,16 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseColor } from "@jamiethompson/oklch";
-
-import {
-  auditOf,
-  safeSeed,
-  withRamp,
-  withRecipe,
-  withStep,
-  type Recipe,
-  type Theme,
-} from "./theme.ts";
+import { auditOf, withStep, type Theme } from "./theme.ts";
 import { themeFromPreset, presetOf, PRESETS } from "./presets.ts";
 
 const preset = (id: string) => PRESETS.find((p) => p.id === id)!;
@@ -68,52 +58,5 @@ describe("presetOf", () => {
   it("names a theme that is not a preset by its name", () => {
     const b: Theme = { ...themeFromPreset(preset("kc")), name: "Acme Co" };
     expect(presetOf(b)).toContain('id: "acme-co"');
-  });
-});
-
-describe("recipes", () => {
-  const teal: Recipe = {
-    kind: "through",
-    color: safeSeed(parseColor("#14b8a6")!, "srgb"),
-    stops: "chromatic",
-  };
-  const red: Recipe = {
-    kind: "hue",
-    hue: 10,
-    saturation: 0.9,
-    stops: "chromatic",
-  };
-
-  it("are written back as the ramps drawn by hand, and read as them", () => {
-    const kc = themeFromPreset(preset("kc"));
-    const b = withRamp(withRecipe(kc, "red", red), "teal", teal);
-    const text = presetOf(b);
-    expect(text).toContain(
-      '"red": { kind: "hue", hue: 10, saturation: 0.9, stops: "chromatic" }',
-    );
-    expect(text).toContain('"teal": { kind: "through", color: { L: ');
-    // Nothing was moved off what the recipes draw, so no moves are written.
-    expect(text).not.toContain("moves:");
-    const back = themeFromPreset({
-      ...preset("kc"),
-      recipes: { red, teal },
-      roles: { accent: "teal" },
-    });
-    expect(back.ramps.map((r) => r.name)).toEqual(b.ramps.map((r) => r.name));
-    expect(back.ramps.find((r) => r.name === "red")!.recipe).toEqual(red);
-    expect(back.ramps.find((r) => r.name === "teal")!.steps).toEqual(
-      b.ramps.find((r) => r.name === "teal")!.steps,
-    );
-    expect(back.assignment).toEqual({ accent: "teal" });
-  });
-
-  it("diff the moves against what the recipe draws, not the seeds", () => {
-    const b = withRecipe(themeFromPreset(preset("kc")), "red", red);
-    const moved = withStep(b, "red", 5, { L: 0.6, C: 0.2, H: 12 });
-    const text = presetOf(moved);
-    expect(text.split("{ ramp:").length - 1).toBe(1);
-    expect(text).toContain(
-      '{ ramp: "red", step: 5, to: { L: 0.6, C: 0.2, H: 12 } }',
-    );
   });
 });

@@ -1,18 +1,10 @@
-import {
-  parseColor,
-  type OkLCH,
-  type TokenAudit,
-  type TokenSetAudit,
-} from "@jamiethompson/oklch";
+import type { OkLCH, TokenAudit, TokenSetAudit } from "@jamiethompson/oklch";
 import { useMemo, useState } from "react";
 
 import { Preview } from "@/components/Preview.tsx";
 import { RampEditor } from "@/components/RampEditor.tsx";
 import { tokenCellId, TokensPanel } from "@/components/TokensPanel.tsx";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import type { Theme, Override, Recipe, Role, Scheme } from "@/lib/theme.ts";
+import type { Theme, Override, Role, Scheme } from "@/lib/theme.ts";
 import { usageOf, type StepRef } from "@/lib/usage.ts";
 
 /** The step selected when nothing has been: the primary's seed step, else its middle. */
@@ -44,91 +36,16 @@ function Section({
   );
 }
 
-/** A new ramp: a name and the color it is drawn through. The ramp's drawer takes it from there. */
-function AddRamp({
-  onAdd,
-}: {
-  onAdd: (name: string, recipe: Recipe) => string | null;
-}) {
-  const [name, setName] = useState("");
-  const [color, setColor] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const draw = () => {
-    const parsed = parseColor(color.trim());
-    if (parsed === null) {
-      setError(`"${color.trim()}" is not a color`);
-      return;
-    }
-    const refused =
-      onAdd(name.trim(), {
-        kind: "through",
-        color: parsed,
-        stops: "chromatic",
-      }) ?? null;
-    setError(refused);
-    if (refused === null) {
-      setName("");
-      setColor("");
-    }
-  };
-  const ready = name.trim() !== "" && color.trim() !== "";
-  return (
-    <section
-      className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed p-3"
-      aria-label="add ramp"
-    >
-      <div className="grid gap-1">
-        <Label htmlFor="ramp-name">Add a ramp</Label>
-        <Input
-          id="ramp-name"
-          className="h-8 w-40"
-          placeholder="name, e.g. teal"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && ready && draw()}
-        />
-      </div>
-      <div className="grid gap-1">
-        <Label htmlFor="ramp-color">Through a color</Label>
-        <Input
-          id="ramp-color"
-          className="h-8 w-44 font-mono text-xs"
-          placeholder="#14b8a6 or oklch(…)"
-          value={color}
-          onChange={(e) => setColor(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && ready && draw()}
-        />
-      </div>
-      <Button variant="outline" disabled={!ready} onClick={draw}>
-        Draw
-      </Button>
-      <p className="w-full text-xs text-muted-foreground">
-        Drawn through the color on chromatic stops; the ramp's drawer can redraw
-        it from a hue or on neutral stops. Give it a role to put it in the
-        palette.
-      </p>
-      {error !== null && (
-        <p className="w-full text-xs text-destructive">{error}</p>
-      )}
-    </section>
-  );
-}
-
 /**
- * The palette as one page: the ramps the seeds drew and the eye added,
- * real components skinned by the tokens as they stand, and the tokens
- * themselves, sharing one selected step. A step shows the tokens that
- * land on it; a token locates the step it came from. Roles are given on
- * the ramp that plays them, and a token's ramp is its role's: the eye
- * moves steps, not ramps.
+ * The palette as one page: the ramps the seeds drafted, real components
+ * skinned by the tokens as they stand, and the tokens themselves, sharing
+ * one selected step. A step shows the tokens that land on it; a token
+ * locates the step it came from. Roles are given on the ramp that plays
+ * them, and a token's ramp is its role's: the eye moves steps, not ramps.
  */
 export interface PaletteActions {
   onStep: (ramp: string, index: number, step: OkLCH) => void;
   onRole: (role: Role, ramp: string) => void;
-  /** Redraw a ramp by a recipe, or by the seeds again with null. Answers with a message when refused. */
-  onRedraw: (ramp: string, recipe: Recipe | null) => string | null;
-  onAddRamp: (name: string, recipe: Recipe) => string | null;
-  onRemoveRamp: (ramp: string) => string | null;
   onOverride: (
     scheme: Scheme,
     token: string,
@@ -188,11 +105,8 @@ export function PalettePanel({
             onShowToken={showToken}
             onRole={(role) => actions.onRole(role, ramp.name)}
             onStep={(i, s) => actions.onStep(ramp.name, i, s)}
-            onRedraw={(recipe) => actions.onRedraw(ramp.name, recipe)}
-            onRemove={() => actions.onRemoveRamp(ramp.name)}
           />
         ))}
-        <AddRamp onAdd={actions.onAddRamp} />
       </Section>
 
       <Section

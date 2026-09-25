@@ -9,8 +9,7 @@ eye, and ship the theme once every pairing clears contrast.
 - **32 presets** drawn from NFL club colors, each hand-tuned. Rename,
   duplicate, or delete any of them, or add a new theme with the +.
 - **Ramps, not fixed palettes.** Every step has sliders; moving one moves
-  every token that lands on it. Redraw any ramp from a hue or through a
-  color, or add ramps of your own.
+  every token that lands on it.
 - **All 31 shadcn/ui tokens**, light and dark, each bound to the ramp its
   role plays. Real shadcn components preview the result as it stands.
 - **A verdict on every pairing.** Surfaces are picked steps, inks are solved

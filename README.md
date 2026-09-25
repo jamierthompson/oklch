@@ -69,6 +69,17 @@ const ink = minPass(ramp.steps, surface, CONTRAST_TARGETS.bodyText);
 
 See [docs/concepts/architecture.md](docs/concepts/architecture.md).
 
+## Agent tooling
+
+- `AGENTS.md` holds project conventions for coding agents; `CLAUDE.md`
+  includes it.
+- `.mcp.json` registers the shadcn MCP server (search, view, and add registry
+  items), pointed at `apps/studio`, where `components.json` lives.
+- `.claude/skills/` holds the official shadcn skills (`shadcn`,
+  `migrate-radix-to-base`), installed with `pnpm dlx skills add shadcn/ui` and
+  tracked in `skills-lock.json`. Do not edit them by hand.
+- `.claude/launch.json` tells Claude Code how to start the studio for previews.
+
 ## License
 
 MIT
